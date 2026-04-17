@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+
+<html lang="ko"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "primary-container": "#ff5a5f",
+                    "on-tertiary-fixed": "#002116",
+                    "surface-bright": "#fcf9f8",
+                    "primary-fixed-dim": "#ffb3b0",
+                    "on-primary-fixed": "#410007",
+                    "tertiary-container": "#00a87f",
+                    "on-primary-fixed-variant": "#92001b",
+                    "inverse-primary": "#ffb3b0",
+                    "error": "#ba1a1a",
+                    "surface-dim": "#dcd9d9",
+                    "on-primary-container": "#61000e",
+                    "surface-container-low": "#f6f3f2",
+                    "secondary-fixed-dim": "#c8bfff",
+                    "surface-container-highest": "#e5e2e1",
+                    "outline": "#8e706f",
+                    "primary-fixed": "#ffdad8",
+                    "secondary-container": "#6c4fff",
+                    "on-primary": "#ffffff",
+                    "tertiary-fixed": "#59fdc7",
+                    "inverse-on-surface": "#f3f0ef",
+                    "secondary": "#522ee7",
+                    "surface-variant": "#e5e2e1",
+                    "error-container": "#ffdad6",
+                    "on-error-container": "#93000a",
+                    "secondary-fixed": "#e5deff",
+                    "on-tertiary-fixed-variant": "#00513c",
+                    "on-background": "#1b1b1c",
+                    "outline-variant": "#e2bebc",
+                    "surface-tint": "#b52330",
+                    "primary": "#b52330",
+                    "on-secondary-fixed": "#190064",
+                    "background": "#fcf9f8",
+                    "on-tertiary-container": "#003425",
+                    "on-surface-variant": "#5a403f",
+                    "on-surface": "#1b1b1c",
+                    "on-secondary-fixed-variant": "#4109d7",
+                    "on-tertiary": "#ffffff",
+                    "surface-container-lowest": "#ffffff",
+                    "surface": "#fcf9f8",
+                    "surface-container-high": "#eae7e7",
+                    "on-error": "#ffffff",
+                    "surface-container": "#f0eded",
+                    "on-secondary-container": "#f7f2ff",
+                    "inverse-surface": "#303030",
+                    "tertiary": "#006c50",
+                    "on-secondary": "#ffffff",
+                    "tertiary-fixed-dim": "#2fe0ac"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "spacing": {},
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Manrope"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .map-placeholder {
+            background-color: #f8f9fa;
+            background-image: 
+                radial-gradient(#e5e7eb 1px, transparent 1px),
+                radial-gradient(#e5e7eb 1px, transparent 1px);
+            background-size: 40px 40px;
+            background-position: 0 0, 20px 20px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface font-body text-on-surface antialiased overflow-hidden h-screen flex flex-col">
+<!-- TopAppBar Shell -->
+<header class="fixed top-0 w-full z-50 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl flex justify-between items-center px-6 h-16 w-full">
+<div class="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer scale-95 active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-[#FF5A5F]">map</span>
+</div>
+<h1 class="font-['Manrope'] font-bold tracking-tight text-2xl font-extrabold text-[#FF5A5F] tracking-tighter">Sple</h1>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest overflow-hidden border border-outline/10 hover:opacity-80 transition-opacity cursor-pointer">
+<img class="w-full h-full object-cover" data-alt="Portrait of a young man with a friendly smile, clean studio lighting, professional headshot style" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA7trLJ91V-Sme7wvD7zkkmLgjuT48f0koKMjgwErxfI2mInmKl3x2xIzUn0h9WlhP55XvQH-hU11yZ3NrDd5V1H5KdLWShl7R091BKkci8QHPOFM44og9cpxWAzcK_HT-lPS4PyA82NpyFSplz3QMH9GzssqQBojvx2cZCnkKe_RYf5qxdHavCNU7ADFKGGiSxGN_ZamfctzXVsB8eJ8GfzJLo_5roquVVrNVcN18v9DSFW7upTSEIL8YB8IzMRSxYAmMCkVnG97Vl"/>
+</div>
+</header>
+<!-- Main Map Canvas Area -->
+<main class="flex-grow relative map-placeholder flex items-center justify-center pt-16">
+<!-- Mock Map Markers (Visual Polish) -->
+<div class="absolute top-1/3 left-1/4 opacity-20 scale-150">
+<span class="material-symbols-outlined text-neutral-400">location_on</span>
+</div>
+<div class="absolute bottom-1/3 right-1/4 opacity-20 scale-125">
+<span class="material-symbols-outlined text-neutral-400">location_on</span>
+</div>
+<!-- Center Focus Graphic (Empty State Hint) -->
+<div class="flex flex-col items-center opacity-10">
+<span class="material-symbols-outlined text-9xl">explore_nearby</span>
+</div>
+<!-- Floating UI Elements Group (Bottom Right) -->
+<div class="absolute bottom-[22%] right-6 flex flex-col items-end z-40">
+<!-- Tooltip Bubble (Guide Mint) -->
+<div class="relative mb-4 max-w-[240px] animate-bounce-subtle">
+<div class="bg-tertiary-container text-on-tertiary-container px-5 py-3 rounded-[24px] shadow-xl text-sm font-semibold leading-relaxed tracking-tight">
+                    인스타에서 공유하기를 눌러 첫 맛집을 추가해 보세요!
+                </div>
+<!-- Tooltip Tail -->
+<div class="absolute -bottom-2 right-8 w-4 h-4 bg-tertiary-container transform rotate-45"></div>
+</div>
+<!-- Primary FAB (Sple Coral) -->
+<button class="w-16 h-16 bg-primary-container text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300 group">
+<span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">add</span>
+</button>
+</div>
+</main>
+<!-- Welcome Bottom Sheet -->
+<section class="bg-surface-container-lowest h-[22%] w-full rounded-t-[40px] z-50 flex flex-col px-8 pt-8 pb-10 shadow-[0_-8px_30px_rgb(0,0,0,0.04)]">
+<!-- Grabber Handle -->
+<div class="w-12 h-1.5 bg-surface-container-highest rounded-full mx-auto mb-6"></div>
+<div class="flex flex-col items-start">
+<h2 class="text-3xl font-headline font-extrabold tracking-tight text-on-surface mb-2">지도가 비어있어요</h2>
+<p class="text-on-surface-variant font-body text-base leading-snug max-w-xs">
+                나만의 맛집 지도를 완성해 보세요.<br/>
+                추가된 장소가 이곳에 나타납니다.
+            </p>
+</div>
+</section>
+<!-- Bottom Navigation Bar Shell -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-3 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl z-50">
+<!-- Explore (Active) -->
+<div class="flex flex-col items-center justify-center bg-[#FF5A5F]/10 text-[#FF5A5F] rounded-full px-5 py-2 scale-110 active:scale-95 transition-all cursor-pointer">
+<span class="material-symbols-outlined mb-0.5">explore</span>
+<span class="font-['Manrope'] text-[10px] font-semibold uppercase tracking-wider">Explore</span>
+</div>
+<!-- Saved -->
+<div class="flex flex-col items-center justify-center text-neutral-400 px-5 py-2 hover:text-[#FF5A5F] transition-colors cursor-pointer group">
+<span class="material-symbols-outlined mb-0.5 group-active:scale-90 transition-transform">bookmark</span>
+<span class="font-['Manrope'] text-[10px] font-semibold uppercase tracking-wider">Saved</span>
+</div>
+<!-- AI Guide -->
+<div class="flex flex-col items-center justify-center text-neutral-400 px-5 py-2 hover:text-[#FF5A5F] transition-colors cursor-pointer group">
+<span class="material-symbols-outlined mb-0.5 group-active:scale-90 transition-transform">auto_awesome</span>
+<span class="font-['Manrope'] text-[10px] font-semibold uppercase tracking-wider">AI Guide</span>
+</div>
+<!-- Profile -->
+<div class="flex flex-col items-center justify-center text-neutral-400 px-5 py-2 hover:text-[#FF5A5F] transition-colors cursor-pointer group">
+<span class="material-symbols-outlined mb-0.5 group-active:scale-90 transition-transform">person</span>
+<span class="font-['Manrope'] text-[10px] font-semibold uppercase tracking-wider">Profile</span>
+</div>
+</nav>
+<style>
+        @keyframes bounce-subtle {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+        .animate-bounce-subtle {
+            animation: bounce-subtle 3s ease-in-out infinite;
+        }
+    </style>
+</body></html>
