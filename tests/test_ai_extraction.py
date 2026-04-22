@@ -1,6 +1,7 @@
 import asyncio
 import os
 import sys
+import pytest
 
 # src 경로 추가
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -8,6 +9,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 from main import extract_place_info
 from dotenv import load_dotenv
 
+@pytest.mark.asyncio
 async def test_extraction():
     # .env 로드
     load_dotenv()
@@ -22,13 +24,14 @@ async def test_extraction():
     print("--- AI 정보 추출 테스트 시작 (google-genai SDK) ---")
     result = await extract_place_info(sample_text)
     
-    if result:
-        print(f"추출 성공!")
-        print(f"상호명: {result.get('name')}")
-        print(f"주소: {result.get('address')}")
-        print(f"설명: {result.get('description')}")
-    else:
-        print("추출 실패 (API 키 또는 모델 설정을 확인하세요)")
+    assert result is not None
+    assert isinstance(result, list)
+    assert len(result) > 0
+    first_place = result[0]
+    assert "name" in first_place
+    assert first_place["name"] == "어니언"
+    assert "address" in first_place
+    assert "서울특별시 성동구 아차산로9길 8" in first_place["address"]
 
 if __name__ == "__main__":
     asyncio.run(test_extraction())

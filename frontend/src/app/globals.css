@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-primary: #FF5A5F;
+  --color-secondary: #6B4EFF;
+  --color-tertiary: #00D09E;
+  --color-background: #F7F8FA;
+  --color-surface: #FFFFFF;
+  --color-text-headline: #1E1E1E;
+  --color-text-body: #868E96;
+  --font-manrope: var(--font-manrope);
+  --font-inter: var(--font-inter);
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-text-headline);
+  font-family: var(--font-inter);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-manrope);
+}
+
+@utility no-scrollbar {
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Glassmorphism utility */
+@utility glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Custom Map Marker Shape */
+.marker-pin {
+  width: 44px;
+  height: 44px;
+  border-radius: 50% 50% 50% 0;
+  background: #FF5A5F;
+  position: absolute;
+  transform: rotate(-45deg);
+  left: 50%;
+  top: 50%;
+  margin: -22px 0 0 -22px;
+  box-shadow: 0 4px 12px rgba(255, 90, 95, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.marker-pin::after {
+  content: '';
+  width: 36px;
+  height: 36px;
+  background: #FFFFFF;
+  border-radius: 50%;
+  position: absolute;
+}
+
+.marker-icon {
+  z-index: 1;
+  transform: rotate(45deg);
+  color: #FF5A5F;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.marker-selected {
+  transform: rotate(-45deg) scale(1.2);
+  background: #6B4EFF;
+  box-shadow: 0 6px 20px rgba(107, 78, 255, 0.5);
+}
+
+.marker-selected::after {
+  background: #6B4EFF;
+}
+
+.marker-selected .marker-icon {
+  color: #FFFFFF;
+}
