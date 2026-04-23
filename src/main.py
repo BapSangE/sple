@@ -83,7 +83,7 @@ app = FastAPI(title="Sple API Server")
 # CORS 설정: 운영 도메인 허용
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL, "http://localhost:3000"], # 운영 및 로컬 개발 환경 허용
+    allow_origins=[FRONTEND_URL, "http://sple-insta.com"], # 운영 및 로컬 개발 환경 허용
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
