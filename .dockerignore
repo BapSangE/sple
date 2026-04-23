@@ -1,0 +1,12 @@
+.venv
+__pycache__
+.git
+.pytest_cache
+tests
+mobile
+frontend
+.env
+*.md
+Dockerfile
+.dockerignore
+node_modules
