@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession, signIn, signOut } from "next-auth/react";
 import { Map, CustomOverlayMap, useKakaoLoader } from "react-kakao-maps-sdk";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -34,6 +35,8 @@ interface Place {
 }
 
 export default function Home() {
+  const { data: session, status } = useSession();
+
   useKakaoLoader({
     appkey: process.env.NEXT_PUBLIC_KAKAO_API_KEY || "",
     libraries: ["services"],
@@ -55,7 +58,8 @@ export default function Home() {
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search?q=${encodeURIComponent(query)}`);
+      const emailParam = session?.user?.email ? `&user_email=${encodeURIComponent(session.user.email)}` : '';
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search?q=${encodeURIComponent(query)}${emailParam}`);
       const data = await res.json();
       if (data.status === "success") {
         setPlaces(data.data);
@@ -132,20 +136,25 @@ export default function Home() {
       }, 500);
     }
 
+  }, []);
+
+  useEffect(() => {
+    if (status === "loading") return;
     const fetchPlaces = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/places`);
+        const emailParam = session?.user?.email ? `?user_email=${encodeURIComponent(session.user.email)}` : '';
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/places${emailParam}`);
         const data = await res.json();
-        if (data.status === "success" && data.data.length > 0) {
+        if (data.status === "success") {
           setPlaces(data.data);
-          setHasFirstPlace(true);
+          setHasFirstPlace(data.data.length > 0);
         }
       } catch (err) {
         console.error("Failed to load places", err);
       }
     };
     fetchPlaces();
-  }, []);
+  }, [session, status]);
 
   const handleAnalyze = async () => {
     if (!urlInput.trim()) return;
@@ -191,7 +200,7 @@ export default function Home() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/save-place`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...place, url: urlInput, lat, lng }),
+        body: JSON.stringify({ ...place, url: urlInput, lat, lng, user_email: session?.user?.email }),
       });
       const data = await res.json();
       if (data.status === "success") {
@@ -226,6 +235,17 @@ export default function Home() {
                 onChange={(e) => handleSearch(e.target.value)}
               />
             </div>
+            {status === "loading" ? (
+              <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse shrink-0"></div>
+            ) : session?.user ? (
+              <button onClick={() => signOut()} className="w-8 h-8 rounded-full overflow-hidden shrink-0 border-2 border-white shadow-sm" title="로그아웃">
+                <img src={session.user.image || `https://ui-avatars.com/api/?name=${session.user.name}`} alt="Profile" className="w-full h-full object-cover" />
+              </button>
+            ) : (
+              <button onClick={() => signIn("google")} className="shrink-0 bg-primary/10 text-primary px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap hover:bg-primary/20 transition-colors">
+                로그인
+              </button>
+            )}
           </div>
           <div className="flex overflow-x-auto px-6 pb-4 no-scrollbar gap-2.5 scroll-smooth">
             {CATEGORIES.map((cat) => {
@@ -323,7 +343,7 @@ export default function Home() {
                   className="flex items-center gap-2 text-text-body mb-8 hover:text-primary transition-colors group px-1"
                 >
                   <ArrowLeft size={18} className="group-hover:-translate-x-1.5 transition-transform" />
-                  <span className="text-xs font-black uppercase tracking-[0.25em]">Back to Explorer</span>
+                  <span className="text-xs font-black uppercase tracking-[0.25em]">탐색기로 돌아가기</span>
                 </button>
                 <h2 className="text-5xl font-black mb-4 text-text-headline tracking-tighter leading-[0.9]">{selectedPlace.name}</h2>
                 <p className="text-sm text-text-body mb-8 font-bold flex items-center gap-1.5 px-1 leading-snug">
@@ -341,7 +361,7 @@ export default function Home() {
                   <div className="mb-10">
                     <div className="flex items-center gap-2.5 mb-5 text-secondary px-1">
                       <Sparkles size={20} fill="currentColor" className="animate-pulse" />
-                      <h3 className="text-xs font-black uppercase tracking-[0.3em]">AI Selected Highlights</h3>
+                      <h3 className="text-xs font-black uppercase tracking-[0.3em]">AI 요약 포인트</h3>
                     </div>
                     <div className="grid gap-4">
                       {selectedPlace.detailed_highlights.split('\n').filter(line => line.trim()).map((highlight, idx) => (
@@ -364,7 +384,7 @@ export default function Home() {
                     className="flex flex-col items-center justify-center gap-3 py-6 bg-[#03C75A]/5 text-[#03C75A] rounded-[32px] border border-[#03C75A]/10 hover:bg-[#03C75A] hover:text-white transition-all group active:scale-95 shadow-sm"
                   >
                     <div className="w-10 h-10 bg-[#03C75A] text-white rounded-2xl flex items-center justify-center font-black text-sm shadow-md group-hover:bg-white group-hover:text-[#03C75A]">N</div>
-                    <span className="text-[11px] font-black uppercase tracking-widest">Naver Map</span>
+                    <span className="text-[11px] font-black uppercase tracking-widest">네이버 지도</span>
                   </a>
                   <a 
                     href={`https://map.kakao.com/link/search/${encodeURIComponent(selectedPlace.name)}`}
@@ -375,7 +395,7 @@ export default function Home() {
                     <div className="w-8 h-8 bg-[#FAE100] text-[#3C1E1E] rounded-2xl flex items-center justify-center shadow-md group-hover:bg-white">
                       <MapIcon size={20} fill="currentColor" />
                     </div>
-                    <span className="text-[11px] font-black uppercase tracking-widest">Kakao Map</span>
+                    <span className="text-[11px] font-black uppercase tracking-widest">카카오맵</span>
                   </a>
                 </div>
 
@@ -403,24 +423,24 @@ export default function Home() {
             ) : (
               <div className="pt-2">
                 <div className="flex items-center justify-between mb-8 px-1">
-                  <h2 className="text-3xl font-black text-text-headline tracking-tighter">My Hotplaces</h2>
+                  <h2 className="text-3xl font-black text-text-headline tracking-tighter">내 핫플</h2>
                   <div className="bg-gray-100 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-text-body shadow-inner">
-                    {visiblePlaces.length} Spots
+                    {visiblePlaces.length} 개의 장소
                   </div>
                 </div>
 
                 {!hasFirstPlace ? (
                   <div className="flex flex-col items-center justify-center py-16 opacity-20">
                     <Bookmark size={64} strokeWidth={1} className="mb-6" />
-                    <p className="font-black tracking-tight text-xl text-center">Your map is empty.<br/>Share from Instagram!</p>
+                    <p className="font-black tracking-tight text-xl text-center">지도가 비어있습니다.<br/>인스타그램에서 공유해보세요!</p>
                   </div>
                 ) : visiblePlaces.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16">
                     <div className="w-20 h-20 bg-gray-50 rounded-[40px] flex items-center justify-center mb-6 text-gray-300">
                       <Navigation size={40} />
                     </div>
-                    <p className="font-black text-xl text-gray-400 tracking-tight">No places in this area.</p>
-                    <p className="text-sm text-gray-300 mt-2 font-bold uppercase tracking-widest">Try moving the map</p>
+                    <p className="font-black text-xl text-gray-400 tracking-tight">이 지역에는 장소가 없습니다.</p>
+                    <p className="text-sm text-gray-300 mt-2 font-bold uppercase tracking-widest">지도를 이동해보세요</p>
                   </div>
                 ) : (
                   <motion.div 
@@ -487,8 +507,8 @@ export default function Home() {
               >
                 <div className="flex justify-between items-center mb-10">
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-black uppercase tracking-[0.4em] text-primary mb-1">New Spot</span>
-                    <h3 className="text-3xl font-black text-text-headline tracking-tighter italic leading-none">AI Magic Analyze</h3>
+                    <span className="text-[10px] font-black uppercase tracking-[0.4em] text-primary mb-1">새로운 장소</span>
+                    <h3 className="text-3xl font-black text-text-headline tracking-tighter italic leading-none">AI 자동 분석</h3>
                   </div>
                   <button onClick={() => { setIsModalOpen(false); setAnalyzedPlaces([]); }} className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center hover:bg-primary hover:text-white transition-all active:scale-90 shadow-sm">
                     <X size={24} strokeWidth={3} />
@@ -503,7 +523,7 @@ export default function Home() {
                         value={urlInput}
                         onChange={(e) => setUrlInput(e.target.value)}
                       />
-                      <div className="absolute bottom-6 right-8 text-[10px] font-black text-gray-300 uppercase tracking-widest">Waiting for input...</div>
+                      <div className="absolute bottom-6 right-8 text-[10px] font-black text-gray-300 uppercase tracking-widest">입력을 기다리는 중...</div>
                     </div>
                     <button 
                       id="analyze-btn"
@@ -511,12 +531,12 @@ export default function Home() {
                       disabled={isLoading}
                       className="w-full bg-gradient-to-br from-[#6B4EFF] to-[#8B74FF] text-white py-6 rounded-[32px] font-black flex justify-center items-center gap-3 shadow-2xl shadow-indigo-500/30 hover:brightness-110 disabled:opacity-50 active:scale-95 transition-all text-xl tracking-tight"
                     >
-                      {isLoading ? <><Loader2 className="animate-spin" size={28} strokeWidth={3} /> Magic Analyzing...</> : "분석 시작하기"}
+                      {isLoading ? <><Loader2 className="animate-spin" size={28} strokeWidth={3} /> 분석 중...</> : "분석 시작하기"}
                     </button>
                   </>
                 ) : (
                   <div className="flex-1 overflow-y-auto pr-3 custom-scrollbar flex flex-col pt-2">
-                    <p className="font-black text-xs text-text-body opacity-50 uppercase tracking-[0.2em] mb-6 px-1">Found {analyzedPlaces.length} places</p>
+                    <p className="font-black text-xs text-text-body opacity-50 uppercase tracking-[0.2em] mb-6 px-1">{analyzedPlaces.length}개의 장소를 찾았습니다</p>
                     <div className="flex flex-col gap-5 mb-8 flex-1 min-h-0">
                       {analyzedPlaces.map((place, idx) => (
                         <div key={idx} className="border-2 border-gray-100/60 p-7 rounded-[40px] bg-white hover:border-primary/20 hover:shadow-2xl transition-all relative group shadow-lg shadow-black/5">
@@ -539,7 +559,7 @@ export default function Home() {
                             onClick={() => handleSave(place)}
                             className="w-full bg-primary text-white py-4.5 rounded-[24px] text-base font-black shadow-xl shadow-primary/20 hover:brightness-110 active:scale-95 transition-all uppercase tracking-widest py-4"
                           >
-                            Add to My Map
+                            내 지도에 추가하기
                           </button>
                         </div>
                       ))}

@@ -23,6 +23,15 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            name TEXT,
+            profile_image TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS places (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -37,9 +46,15 @@ def init_db():
             categories TEXT, -- JSON array of selected categories
             image_url TEXT,
             detailed_highlights TEXT,
+            user_email TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    try:
+        cursor.execute("ALTER TABLE places ADD COLUMN user_email TEXT")
+    except sqlite3.OperationalError:
+        pass # Column already exists
+
     conn.commit()
     conn.close()
 
@@ -93,6 +108,7 @@ class PlaceSaveRequest(BaseModel):
     tags: list = []
     categories: list = []
     detailed_highlights: str = ""
+    user_email: str = None
 
 # --- Utility Functions ---
 
@@ -203,13 +219,16 @@ async def share_target(request: Request, text: str = None, url: str = None):
     return RedirectResponse(url=redirect_url)
 
 @app.get("/api/places")
-async def get_places():
+async def get_places(user_email: str = None):
     """저장된 모든 장소 목록을 반환합니다."""
     try:
         with sqlite3.connect(DB_PATH) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM places ORDER BY created_at DESC")
+            if user_email:
+                cursor.execute("SELECT * FROM places WHERE user_email = ? ORDER BY created_at DESC", (user_email,))
+            else:
+                cursor.execute("SELECT * FROM places ORDER BY created_at DESC")
             rows = cursor.fetchall()
             places = [dict(row) for row in rows]
         return JSONResponse(content={"status": "success", "data": places})
@@ -237,8 +256,8 @@ async def save_place_api(request: PlaceSaveRequest):
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                """INSERT INTO places (name, address, description, url, lat, lng, rating, tags, categories, detailed_highlights) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                """INSERT INTO places (name, address, description, url, lat, lng, rating, tags, categories, detailed_highlights, user_email) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     request.name, 
                     request.address, 
@@ -249,7 +268,8 @@ async def save_place_api(request: PlaceSaveRequest):
                     request.rating, 
                     json.dumps(request.tags), 
                     json.dumps(request.categories), 
-                    request.detailed_highlights
+                    request.detailed_highlights,
+                    request.user_email
                 )
             )
             conn.commit()
@@ -259,20 +279,26 @@ async def save_place_api(request: PlaceSaveRequest):
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 
 @app.get("/api/search")
-async def search_places(q: str = ""):
+async def search_places(q: str = "", user_email: str = None):
     """장소 검색 API"""
     if not q:
-        return await get_places()
+        return await get_places(user_email)
         
     try:
         query = f"%{q}%"
         with sqlite3.connect(DB_PATH) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT * FROM places WHERE name LIKE ? OR address LIKE ? ORDER BY created_at DESC", 
-                (query, query)
-            )
+            if user_email:
+                cursor.execute(
+                    "SELECT * FROM places WHERE (name LIKE ? OR address LIKE ?) AND user_email = ? ORDER BY created_at DESC", 
+                    (query, query, user_email)
+                )
+            else:
+                cursor.execute(
+                    "SELECT * FROM places WHERE name LIKE ? OR address LIKE ? ORDER BY created_at DESC", 
+                    (query, query)
+                )
             rows = cursor.fetchall()
             places = [dict(row) for row in rows]
         return JSONResponse(content={"status": "success", "data": places})

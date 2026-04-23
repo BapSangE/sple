@@ -61,7 +61,7 @@ Route 53 콘솔에서 다음 레코드를 생성하세요.
 1. **환경 변수 설정 (`.env.production`):**
    ```env
    NEXT_PUBLIC_KAKAO_API_KEY=your_kakao_js_key
-   NEXT_PUBLIC_API_URL=https://api.sple-insta.com
+   NEXT_PUBLIC_API_URL=https://sple-insta.com
    ```
 2. **빌드 및 배포:**
    - Vercel 연동 시 깃허브 푸시만으로 자동 배포 가능.

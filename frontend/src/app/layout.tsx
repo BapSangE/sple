@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Manrope, Inter } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
+import { Providers } from "@/components/Providers";
 
 const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope" });
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -44,7 +45,7 @@ export default function RootLayout({
             `,
           }}
         />
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
