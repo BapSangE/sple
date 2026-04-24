@@ -1,6 +1,6 @@
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse, RedirectResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
@@ -11,55 +11,15 @@ from bs4 import BeautifulSoup
 from google import genai
 import json
 import re
-import sqlite3
+
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy import or_
+
+from database import init_db, get_db, async_session, Place
 
 # .env 파일 로드
 load_dotenv()
-
-# 데이터베이스 파일 경로
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sple.db")
-
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE NOT NULL,
-            name TEXT,
-            profile_image TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS places (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            address TEXT NOT NULL,
-            description TEXT,
-            url TEXT,
-            lat REAL,
-            lng REAL,
-            rating REAL,
-            tags TEXT,
-            category TEXT,
-            categories TEXT, -- JSON array of selected categories
-            image_url TEXT,
-            detailed_highlights TEXT,
-            user_email TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    try:
-        cursor.execute("ALTER TABLE places ADD COLUMN user_email TEXT")
-    except sqlite3.OperationalError:
-        pass # Column already exists
-
-    conn.commit()
-    conn.close()
-
-# DB 초기화 실행
-init_db()
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -78,7 +38,13 @@ if GEMINI_API_KEY:
 else:
     logger.warning("GEMINI_API_KEY가 설정되지 않았습니다.")
 
-app = FastAPI(title="Sple API Server")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 앱 시작 시 DB 스키마 생성
+    await init_db()
+    yield
+
+app = FastAPI(title="Sple API Server", lifespan=lifespan)
 
 # CORS 설정: 운영 도메인 허용
 app.add_middleware(
@@ -200,6 +166,11 @@ async def send_ig_reply(recipient_id: str, message_text: str):
     async with httpx.AsyncClient() as client_http:
         await client_http.post(url, json=payload)
 
+# --- Helper Function for SQLAlchemy Models ---
+def row_to_dict(row):
+    """SQLAlchemy 모델 객체를 딕셔너리로 변환합니다."""
+    return {c.name: getattr(row, c.name) for c in row.__table__.columns}
+
 # --- API Endpoints ---
 
 @app.get("/")
@@ -225,19 +196,27 @@ async def share_target(request: Request, text: str = None, url: str = None):
     return RedirectResponse(url=redirect_url)
 
 @app.get("/api/places")
-async def get_places(user_email: str = None):
+async def get_places(user_email: str = None, db: AsyncSession = Depends(get_db)):
     """저장된 모든 장소 목록을 반환합니다."""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            if user_email:
-                cursor.execute("SELECT * FROM places WHERE user_email = ? ORDER BY created_at DESC", (user_email,))
-            else:
-                cursor.execute("SELECT * FROM places ORDER BY created_at DESC")
-            rows = cursor.fetchall()
-            places = [dict(row) for row in rows]
-        return JSONResponse(content={"status": "success", "data": places})
+        stmt = select(Place).order_by(Place.created_at.desc())
+        if user_email:
+            stmt = stmt.where(Place.user_email == user_email)
+            
+        result = await db.execute(stmt)
+        places = result.scalars().all()
+        
+        places_data = [row_to_dict(p) for p in places]
+        # Parse JSON strings back to lists for frontend compatibility
+        for p in places_data:
+            if p.get('tags'):
+                try: p['tags'] = json.loads(p['tags'])
+                except: p['tags'] = []
+            if p.get('categories'):
+                try: p['categories'] = json.loads(p['categories'])
+                except: p['categories'] = []
+                
+        return JSONResponse(content={"status": "success", "data": places_data})
     except Exception as e:
         logger.exception("Error fetching places from DB")
         return JSONResponse(content={"status": "error", "message": "장소 목록을 불러오는 중 오류가 발생했습니다."}, status_code=500)
@@ -256,58 +235,58 @@ async def analyze_place_api(request: PlaceRequest):
     return JSONResponse(content={"status": "success", "data": extracted_data})
 
 @app.post("/api/save-place")
-async def save_place_api(request: PlaceSaveRequest):
+async def save_place_api(request: PlaceSaveRequest, db: AsyncSession = Depends(get_db)):
     """장소 데이터를 DB에 저장합니다."""
     try:
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """INSERT INTO places (name, address, description, url, lat, lng, rating, tags, categories, detailed_highlights, user_email) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    request.name, 
-                    request.address, 
-                    request.description, 
-                    request.url, 
-                    request.lat, 
-                    request.lng, 
-                    request.rating, 
-                    json.dumps(request.tags), 
-                    json.dumps(request.categories), 
-                    request.detailed_highlights,
-                    request.user_email
-                )
-            )
-            conn.commit()
+        new_place = Place(
+            name=request.name,
+            address=request.address,
+            description=request.description,
+            url=request.url,
+            lat=request.lat,
+            lng=request.lng,
+            rating=request.rating,
+            tags=json.dumps(request.tags),
+            categories=json.dumps(request.categories),
+            detailed_highlights=request.detailed_highlights,
+            user_email=request.user_email
+        )
+        db.add(new_place)
+        await db.commit()
         return JSONResponse(content={"status": "success", "message": "저장되었습니다."})
     except Exception as e:
         logger.error(f"Save error: {e}")
+        await db.rollback()
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 
 @app.get("/api/search")
-async def search_places(q: str = "", user_email: str = None):
+async def search_places(q: str = "", user_email: str = None, db: AsyncSession = Depends(get_db)):
     """장소 검색 API"""
     if not q:
-        return await get_places(user_email)
+        return await get_places(user_email=user_email, db=db)
         
     try:
         query = f"%{q}%"
-        with sqlite3.connect(DB_PATH) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            if user_email:
-                cursor.execute(
-                    "SELECT * FROM places WHERE (name LIKE ? OR address LIKE ?) AND user_email = ? ORDER BY created_at DESC", 
-                    (query, query, user_email)
-                )
-            else:
-                cursor.execute(
-                    "SELECT * FROM places WHERE name LIKE ? OR address LIKE ? ORDER BY created_at DESC", 
-                    (query, query)
-                )
-            rows = cursor.fetchall()
-            places = [dict(row) for row in rows]
-        return JSONResponse(content={"status": "success", "data": places})
+        stmt = select(Place).where(
+            or_(Place.name.ilike(query), Place.address.ilike(query))
+        ).order_by(Place.created_at.desc())
+        
+        if user_email:
+            stmt = stmt.where(Place.user_email == user_email)
+            
+        result = await db.execute(stmt)
+        places = result.scalars().all()
+        
+        places_data = [row_to_dict(p) for p in places]
+        for p in places_data:
+            if p.get('tags'):
+                try: p['tags'] = json.loads(p['tags'])
+                except: p['tags'] = []
+            if p.get('categories'):
+                try: p['categories'] = json.loads(p['categories'])
+                except: p['categories'] = []
+                
+        return JSONResponse(content={"status": "success", "data": places_data})
     except Exception as e:
         logger.exception("Search error")
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
@@ -327,7 +306,7 @@ async def verify_webhook(request: Request):
     raise HTTPException(status_code=403, detail="Verification failed")
 
 @app.post("/api/webhook/instagram")
-async def handle_webhook(request: Request):
+async def handle_webhook(request: Request, db: AsyncSession = Depends(get_db)):
     """실제 DM 메시지 수신 처리 및 자동 저장"""
     data = await request.json()
     try:
@@ -351,17 +330,23 @@ async def handle_webhook(request: Request):
                             extracted_list = await extract_place_info(metadata["raw_text"])
                             if extracted_list and isinstance(extracted_list, list):
                                 for p_data in extracted_list:
-                                    with sqlite3.connect(DB_PATH) as conn:
-                                        cursor = conn.cursor()
-                                        cursor.execute(
-                                            "INSERT INTO places (name, address, description, url, lat, lng, categories, detailed_highlights) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                                            (p_data["name"], p_data["address"], p_data["description"], target_url, p_data.get("lat"), p_data.get("lng"), json.dumps(p_data.get("categories", [])), p_data.get("detailed_highlights", ""))
-                                        )
-                                        conn.commit()
-                                await send_ig_reply(sender_id, f"✅ '{extracted_list[0]['name']}' 등 정보를 추가했어요!")
+                                    new_place = Place(
+                                        name=p_data.get("name", ""),
+                                        address=p_data.get("address", ""),
+                                        description=p_data.get("description", ""),
+                                        url=target_url,
+                                        lat=p_data.get("lat"),
+                                        lng=p_data.get("lng"),
+                                        categories=json.dumps(p_data.get("categories", [])),
+                                        detailed_highlights=p_data.get("detailed_highlights", "")
+                                    )
+                                    db.add(new_place)
+                                await db.commit()
+                                await send_ig_reply(sender_id, f"✅ '{extracted_list[0].get('name', '장소')}' 등 정보를 추가했어요!")
 
     except Exception as e:
         logger.error(f"Webhook error: {e}")
+        await db.rollback()
     return JSONResponse(content={"status": "ok"})
 
 if __name__ == "__main__":
