@@ -181,6 +181,8 @@ async def read_root():
         "message": "Sple API Server is running",
         "frontend": FRONTEND_URL
     }
+def health_check():
+    return {"status": "ok", "message": "Server is alive!"}
 
 @app.get("/share-target")
 async def share_target(request: Request, text: str = None, url: str = None):
