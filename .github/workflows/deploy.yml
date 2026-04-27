@@ -34,7 +34,7 @@ jobs:
 
       - name: Download current Task Definition
         run: |
-          aws ecs describe-task-definition --task-definition sple-backend-task --query taskDefinition > task-definition.json
+          aws ecs describe-task-definition --task-definition default-sple-backend-6440 --query taskDefinition > task-definition.json
 
       - name: Fill in the new image ID and Environment Variables in the Amazon ECS task definition
         id: task-def
