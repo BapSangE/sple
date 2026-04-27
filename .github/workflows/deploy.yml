@@ -40,7 +40,7 @@ jobs:
       # 2. v1 -> v2 로 버전을 올려줍니다 (Node.js 구버전 경고 해결)
       - name: Fill in the new image ID and Environment Variables in the Amazon ECS task definition
         id: task-def
-        uses: aws-actions/amazon-ecs-render-task-definition@v2
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: task-definition.json
           container-name: Main
