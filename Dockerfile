@@ -32,5 +32,8 @@ COPY src/ /app/src/
 # 포트 설정
 EXPOSE 8000
 
+# 추가: 실행 직전에 작업 폴더를 src 안으로 이동시킵니다.
+WORKDIR /app/src
+
 # 실행
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
