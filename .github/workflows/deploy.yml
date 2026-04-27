@@ -2,7 +2,7 @@ name: Sple Backend Deploy
 
 on:
   push:
-    branches: ["main"] # main 브랜치에 코드가 올라가면 실행
+    branches: ["main"]
 
 jobs:
   deploy:
@@ -25,11 +25,31 @@ jobs:
       - name: Build and Push Docker image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: sple-backend # 기획자님의 ECR 레포지토리 이름
+          ECR_REPOSITORY: sple-backend
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-      - name: Deploy to ECS (Force New Deployment)
+      # --- 여기서부터 환경변수 반영 로직 추가 ---
+
+      - name: Download current Task Definition
         run: |
-          aws ecs update-service --cluster default --service sple-backend-6440 --force-new-deployment
+          aws ecs describe-task-definition --task-definition sple-backend-task --query taskDefinition > task-definition.json
+
+      - name: Fill in the new image ID and Environment Variables in the Amazon ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: sple-backend # ECS 컨테이너 이름 확인 필요
+          image: ${{ steps.login-ecr.outputs.registry }}/sple-backend:latest
+          environment-variables: |
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+
+      - name: Deploy to Amazon ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: sple-backend-6440
+          cluster: default
+          wait-for-service-stability: true
