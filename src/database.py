@@ -18,7 +18,12 @@ if not DATABASE_URL:
     DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sple.db")
     DATABASE_URL = f"sqlite+aiosqlite:///{DB_PATH}"
 
-engine = create_async_engine(DATABASE_URL, echo=False)
+engine = create_async_engine(
+    DATABASE_URL, 
+    echo=False,
+    # 🌟 핵심: 캐시 사이즈를 0으로 설정하여 PgBouncer와의 충돌을 방지합니다.
+    connect_args={"statement_cache_size": 0} 
+)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 Base = declarative_base()
