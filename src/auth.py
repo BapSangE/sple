@@ -7,12 +7,15 @@ from google.auth.transport import requests
 import os
 import jwt
 from datetime import datetime, timedelta, timezone
+import logging
 
 from database import get_db, User
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+# 환경 변수에서 값 로드 후 따옴표 제거 (실수로 따옴표가 포함된 경우 대비)
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip("'\"")
 # 프론트엔드의 NEXTAUTH_SECRET과 동일하거나, 백엔드 전용 SECRET을 사용합니다.
 JWT_SECRET = os.getenv("NEXTAUTH_SECRET", os.getenv("JWT_SECRET", "super-secret-key-change-me-later"))
 ALGORITHM = "HS256"
@@ -35,6 +38,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 async def google_login(request: GoogleLoginRequest, db: AsyncSession = Depends(get_db)):
     token = request.id_token
     if not GOOGLE_CLIENT_ID:
+        logger.error("GOOGLE_CLIENT_ID is missing or empty")
         raise HTTPException(status_code=500, detail="GOOGLE_CLIENT_ID is not configured on the server")
         
     try:
@@ -90,4 +94,5 @@ async def google_login(request: GoogleLoginRequest, db: AsyncSession = Depends(g
         }
         
     except ValueError as e:
+        logger.error(f"Google Token Verification Failed: {e}")
         raise HTTPException(status_code=401, detail=f"Invalid token: {e}")

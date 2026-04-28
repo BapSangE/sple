@@ -58,8 +58,10 @@ export default function Home() {
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
     try {
+      const token = (session as any)?.accessToken;
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search?q=${encodeURIComponent(query)}`, {
-        headers: { "Authorization": `Bearer ${(session as any)?.accessToken || ""}` }
+        headers: { "Authorization": `Bearer ${token || ""}` },
+        credentials: "include"
       });
       const data = await res.json();
       if (data.status === "success") {
@@ -146,10 +148,27 @@ export default function Home() {
         setPlaces([]);
         return;
       }
+      
+      const token = (session as any)?.accessToken;
+      // 기존에 로그인되어 있던 세션이지만 백엔드 토큰(accessToken)이 없는 경우 (쿠키 갱신 필요)
+      if (!token) {
+        console.warn("세션은 존재하지만 토큰이 없습니다. 재로그인이 필요합니다.");
+        signOut();
+        return;
+      }
+
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/places`, {
-          headers: { "Authorization": `Bearer ${(session as any)?.accessToken || ""}` }
+          headers: { "Authorization": `Bearer ${token}` },
+          credentials: "include"
         });
+        
+        if (res.status === 401) {
+          console.warn("토큰이 만료되었거나 유효하지 않습니다.");
+          signOut();
+          return;
+        }
+        
         const data = await res.json();
         if (data.status === "success") {
           setPlaces(data.data);
@@ -172,6 +191,7 @@ export default function Home() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ url: urlInput }),
       });
       const data = await res.json();
@@ -193,6 +213,14 @@ export default function Home() {
       signIn("google");
       return;
     }
+    
+    const token = (session as any)?.accessToken;
+    if (!token) {
+      alert("로그인 정보가 만료되었습니다. 다시 로그인해주세요.");
+      signOut();
+      return;
+    }
+
     try {
       let lat = place.lat;
       let lng = place.lng;
@@ -215,10 +243,18 @@ export default function Home() {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${(session as any)?.accessToken || ""}`
+          "Authorization": `Bearer ${token}`
         },
+        credentials: "include",
         body: JSON.stringify({ ...place, url: urlInput, lat, lng, user_email: session?.user?.email }),
       });
+      
+      if (res.status === 401) {
+        alert("인증이 만료되었습니다. 다시 로그인해주세요.");
+        signOut();
+        return;
+      }
+      
       const data = await res.json();
       if (data.status === "success") {
         alert(`'${place.name}' 장소가 저장되었습니다!`);

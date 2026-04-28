@@ -43,13 +43,15 @@ security = HTTPBearer(auto_error=False)
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     if not credentials:
+        logger.warning("get_current_user: No credentials provided in request")
         raise HTTPException(status_code=401, detail="Not authenticated")
     token = credentials.credentials
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
         return payload
     except Exception as e:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        logger.warning(f"get_current_user: JWT Decode Error - {e}")
+        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
 client = None
 if GEMINI_API_KEY:
