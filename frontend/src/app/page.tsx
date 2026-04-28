@@ -7,7 +7,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Plus, X, Loader2, Navigation, Bookmark, ArrowLeft, Search, 
   Coffee, Utensils, Wine, ShoppingBag, Camera, Trees, Hotel, 
-  Globe, Sparkles, Check, Map as MapIcon, ExternalLink 
+  Globe, Sparkles, Check, Map as MapIcon, ExternalLink,
+  Link as LinkIcon, Play
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -19,6 +20,45 @@ const CATEGORIES = [
   { id: "culture", label: "문화", icon: Camera },
   { id: "nature", label: "자연", icon: Trees },
   { id: "stay", label: "숙소", icon: Hotel },
+];
+
+const DEMO_PLACES: Place[] = [
+  {
+    id: "demo1",
+    name: "어니언 성수",
+    address: "서울 성동구 아차산로9길 8",
+    description: "성수동의 폐공장을 개조한 빈티지 감성의 베이커리 카페",
+    url: "https://www.instagram.com/onion.seongsu",
+    lat: 37.5445,
+    lng: 127.0575,
+    rating: 4.5,
+    categories: ["cafe"],
+    detailed_highlights: "• 폐공장의 거친 매력이 살아있는 독특한 인테리어\n• 시그니처 빵 팡도르 필수 주문\n• 널찍한 루프탑과 중정"
+  },
+  {
+    id: "demo2",
+    name: "제스티살룬 성수",
+    address: "서울 성동구 서울숲2길 19",
+    description: "새우버거가 기가 막히는 성수동 수제버거 맛집",
+    url: "https://www.instagram.com/zestysaloon",
+    lat: 37.5463,
+    lng: 127.0405,
+    rating: 4.8,
+    categories: ["restaurant"],
+    detailed_highlights: "• 통통한 새우살이 씹히는 와사비 쉬림프 버거\n• 웨이팅이 길지만 기다릴 가치가 있는 맛\n• 힙한 감성의 매장 분위기"
+  },
+  {
+    id: "demo3",
+    name: "피치스 도원",
+    address: "서울 성동구 연무장3길 9",
+    description: "자동차 문화를 기반으로 한 복합문화공간 및 도넛",
+    url: "https://www.instagram.com/peaches_d8ne",
+    lat: 37.5446,
+    lng: 127.0538,
+    rating: 4.4,
+    categories: ["culture", "cafe"],
+    detailed_highlights: "• 전시된 멋진 자동차들과 인증샷 필수\n• 노티드 도넛과 젤라또를 즐길 수 있는 공간\n• 힙한 스트릿 감성의 결정체"
+  }
 ];
 
 interface Place {
@@ -54,9 +94,22 @@ export default function Home() {
   const [visiblePlaces, setVisiblePlaces] = useState<Place[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("all");
+  
+  // Phase 2 & 3 States
+  const [isMiniFabOpen, setIsMiniFabOpen] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
+    if (isDemoMode) {
+      if (!query) {
+        setPlaces(DEMO_PLACES);
+      } else {
+        setPlaces(DEMO_PLACES.filter(p => p.name.includes(query) || p.address.includes(query)));
+      }
+      return;
+    }
+    
     try {
       const token = (session as any)?.accessToken;
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search?q=${encodeURIComponent(query)}`, {
@@ -142,7 +195,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (status === "loading") return;
+    if (status === "loading" || isDemoMode) return;
     const fetchPlaces = async () => {
       if (!session) {
         setPlaces([]);
@@ -150,7 +203,6 @@ export default function Home() {
       }
       
       const token = (session as any)?.accessToken;
-      // 기존에 로그인되어 있던 세션이지만 백엔드 토큰(accessToken)이 없는 경우 (쿠키 갱신 필요)
       if (!token) {
         console.warn("세션은 존재하지만 토큰이 없습니다. 재로그인이 필요합니다.");
         signOut();
@@ -182,7 +234,19 @@ export default function Home() {
       }
     };
     fetchPlaces();
-  }, [session, status]);
+  }, [session, status, isDemoMode]);
+
+  const handleToggleDemo = () => {
+    if (isDemoMode) {
+      setIsDemoMode(false);
+      setPlaces([]);
+      setMapCenter({ lat: 37.5665, lng: 126.9780 });
+    } else {
+      setIsDemoMode(true);
+      setPlaces(DEMO_PLACES);
+      setMapCenter({ lat: DEMO_PLACES[0].lat, lng: DEMO_PLACES[0].lng });
+    }
+  };
 
   const handleAnalyze = async () => {
     if (!urlInput.trim()) return;
@@ -258,6 +322,8 @@ export default function Home() {
       const data = await res.json();
       if (data.status === "success") {
         alert(`'${place.name}' 장소가 저장되었습니다!`);
+        // If in demo mode, switch back to real mode to see the saved place
+        if (isDemoMode) setIsDemoMode(false);
         setPlaces(prev => [{ ...place, id: Date.now().toString(), lat, lng, url: urlInput }, ...prev]);
         setHasFirstPlace(true);
         setIsModalOpen(false);
@@ -270,6 +336,8 @@ export default function Home() {
       alert("저장 중 오류가 발생했습니다.");
     }
   };
+
+  const isDataEmpty = !hasFirstPlace && !isDemoMode;
 
   return (
     <div className="relative w-full h-full flex justify-center bg-gray-100 sm:items-center sm:py-10">
@@ -304,14 +372,19 @@ export default function Home() {
             {CATEGORIES.map((cat) => {
               const Icon = cat.icon;
               const isActive = selectedCategoryId === cat.id;
+              const isDisabled = isDataEmpty;
+              
               return (
                 <button
                   key={cat.id}
+                  disabled={isDisabled}
                   onClick={() => setSelectedCategoryId(cat.id)}
                   className={`flex items-center gap-1.5 px-5 py-2.5 rounded-full text-xs font-black whitespace-nowrap transition-all border-2 ${
-                    isActive 
-                      ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-105" 
-                      : "bg-white/80 text-text-body border-transparent hover:border-gray-200"
+                    isDisabled 
+                      ? "opacity-30 pointer-events-none bg-white/80 text-text-body border-transparent"
+                      : isActive 
+                        ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-105" 
+                        : "bg-white/80 text-text-body border-transparent hover:border-gray-200"
                   }`}
                 >
                   <Icon size={14} strokeWidth={3} />
@@ -351,29 +424,38 @@ export default function Home() {
             })}
           </Map>
 
-          <div className="absolute bottom-[260px] right-6 flex flex-col items-end z-40">
+          <div className="absolute bottom-[240px] right-6 flex flex-col items-end z-40">
             <AnimatePresence>
-              {!hasFirstPlace && (
+              {isMiniFabOpen && (
                 <motion.div 
-                  initial={{ opacity: 0, y: 10, scale: 0.8 }}
-                  animate={{ opacity: 1, y: [0, -12, 0], scale: 1 }}
-                  transition={{ 
-                    y: { repeat: Infinity, duration: 2, ease: "easeInOut" },
-                    opacity: { duration: 0.5 }
-                  }}
-                  exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
-                  className="bg-gradient-to-br from-tertiary to-[#00B88A] text-white px-7 py-5 rounded-[32px] shadow-2xl shadow-tertiary/30 mb-6 text-sm font-black relative text-center leading-relaxed"
+                  initial={{ opacity: 0, y: 20, scale: 0.8 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 20, scale: 0.8 }}
+                  transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                  className="absolute bottom-24 right-0 bg-white p-4 rounded-[28px] shadow-2xl border border-gray-100 flex flex-col gap-2 w-[220px]"
                 >
-                  인스타에서 공유하기를 눌러<br/>첫 맛집을 추가해 보세요! ✨
-                  <div className="absolute -bottom-2 right-8 w-5 h-5 bg-[#00B88A] rotate-45 rounded-sm" />
+                  <div className="text-xs font-black text-text-body mb-1 px-2 uppercase tracking-widest opacity-60">인스타 링크 복사하셨나요?</div>
+                  <button 
+                    onClick={() => { setIsMiniFabOpen(false); setIsModalOpen(true); }}
+                    className="w-full text-left px-4 py-4 bg-gray-50 hover:bg-primary/10 hover:text-primary rounded-2xl font-black text-sm transition-colors flex items-center gap-3 group"
+                  >
+                    <div className="bg-white p-2 rounded-xl shadow-sm group-hover:scale-110 transition-transform text-primary">
+                      <LinkIcon size={16} strokeWidth={3} />
+                    </div>
+                    분석 시작하기
+                  </button>
                 </motion.div>
               )}
             </AnimatePresence>
             <button 
-              onClick={() => setIsModalOpen(true)}
-              className="w-18 h-18 bg-gradient-to-br from-primary via-[#FF6B6B] to-[#FF8589] rounded-[28px] text-white flex items-center justify-center shadow-2xl shadow-primary/40 hover:scale-110 active:scale-90 transition-all border-4 border-white/20"
+              onClick={() => setIsMiniFabOpen(!isMiniFabOpen)}
+              className={`w-18 h-18 rounded-[28px] text-white flex items-center justify-center shadow-2xl hover:scale-110 active:scale-90 transition-all border-4 border-white/20 ${
+                isMiniFabOpen 
+                  ? "bg-gray-800" 
+                  : "bg-gradient-to-br from-primary via-[#FF6B6B] to-[#FF8589] shadow-primary/40"
+              }`}
             >
-              <Plus size={40} strokeWidth={3} />
+              {isMiniFabOpen ? <X size={32} strokeWidth={3} /> : <LinkIcon size={32} strokeWidth={3} />}
             </button>
           </div>
         </main>
@@ -381,14 +463,14 @@ export default function Home() {
         {/* Bottom Sheet */}
         <motion.div 
           className="absolute bottom-0 w-full bg-white rounded-t-[48px] shadow-[0_-20px_60px_rgba(0,0,0,0.15)] z-50 flex flex-col border-t border-gray-50"
-          animate={{ height: selectedPlace ? '75%' : '240px' }}
+          animate={{ height: selectedPlace ? '75%' : (isDataEmpty ? '280px' : '220px') }}
           transition={{ type: "spring", damping: 30, stiffness: 150 }}
         >
-          <div className="w-full flex justify-center py-5 cursor-pointer absolute top-0 z-10" onClick={() => setSelectedPlace(null)}>
+          <div className="w-full flex justify-center py-6 cursor-pointer absolute top-0 z-10" onClick={() => setSelectedPlace(null)}>
             <div className="w-16 h-1.5 bg-gray-200/80 rounded-full" />
           </div>
           
-          <div className="px-8 pb-10 overflow-y-auto flex-1 custom-scrollbar pt-10">
+          <div className="px-8 pb-10 overflow-y-auto flex-1 custom-scrollbar pt-12">
             {selectedPlace ? (
               <div className="animate-in fade-in slide-in-from-bottom-6 duration-500">
                 <button 
@@ -474,73 +556,110 @@ export default function Home() {
                 </div>
               </div>
             ) : (
-              <div className="pt-2">
-                <div className="flex items-center justify-between mb-8 px-1">
-                  <h2 className="text-3xl font-black text-text-headline tracking-tighter">내 핫플</h2>
-                  <div className="bg-gray-100 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-text-body shadow-inner">
-                    {visiblePlaces.length} 개의 장소
-                  </div>
-                </div>
-
-                {!hasFirstPlace ? (
-                  <div className="flex flex-col items-center justify-center py-16 opacity-20">
-                    <Bookmark size={64} strokeWidth={1} className="mb-6" />
-                    <p className="font-black tracking-tight text-xl text-center">지도가 비어있습니다.<br/>인스타그램에서 공유해보세요!</p>
+              <div>
+                {isDataEmpty ? (
+                  <div className="flex flex-col items-center justify-center animate-in fade-in duration-700">
+                    <div className="w-14 h-14 bg-[#F2F2F2] rounded-3xl flex items-center justify-center text-text-headline mb-4 shadow-sm">
+                      <Camera size={28} />
+                    </div>
+                    <h3 className="font-black text-[22px] tracking-tighter mb-2 text-center text-text-headline leading-tight">
+                      인스타 핫플을<br/>가장 쉽게 저장하세요
+                    </h3>
+                    <p className="text-xs text-text-body text-center mb-6 font-bold">
+                      게시물의 [공유하기] 버튼을 눌러<br/>스플로 보내면 AI가 알아서 찾아드려요!
+                    </p>
+                    
+                    <button 
+                      onClick={handleToggleDemo}
+                      className="text-xs font-black text-[#6B4EFF] bg-indigo-50 px-4 py-2.5 rounded-full hover:bg-indigo-100 transition-colors flex items-center gap-1.5 shadow-sm mb-2"
+                    >
+                      <Play size={14} fill="currentColor" />
+                      성수동 에디터 픽 미리보기
+                    </button>
                   </div>
                 ) : visiblePlaces.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16">
-                    <div className="w-20 h-20 bg-gray-50 rounded-[40px] flex items-center justify-center mb-6 text-gray-300">
-                      <Navigation size={40} />
+                  <div className="flex flex-col items-center justify-center py-8">
+                    <div className="w-16 h-16 bg-gray-50 rounded-[32px] flex items-center justify-center mb-5 text-gray-300">
+                      <Navigation size={32} />
                     </div>
-                    <p className="font-black text-xl text-gray-400 tracking-tight">이 지역에는 장소가 없습니다.</p>
-                    <p className="text-sm text-gray-300 mt-2 font-bold uppercase tracking-widest">지도를 이동해보세요</p>
+                    <p className="font-black text-lg text-gray-400 tracking-tight mb-1">장소를 찾을 수 없습니다.</p>
+                    <p className="text-xs text-gray-300 font-bold uppercase tracking-widest">지도를 넓게 이동해보세요</p>
+                    {isDemoMode && (
+                      <button 
+                        onClick={handleToggleDemo}
+                        className="mt-6 text-xs font-black text-primary bg-primary/10 px-4 py-2 rounded-full hover:bg-primary/20 transition-colors"
+                      >
+                        내 지도로 돌아가기
+                      </button>
+                    )}
                   </div>
                 ) : (
-                  <motion.div 
-                    className="flex flex-col gap-5"
-                    initial="hidden"
-                    animate="show"
-                    variants={{
-                      hidden: { opacity: 0 },
-                      show: {
-                        opacity: 1,
-                        transition: { staggerChildren: 0.12 }
-                      }
-                    }}
-                  >
-                    {visiblePlaces.map(p => (
-                      <motion.div 
-                        key={p.id} 
-                        onClick={() => setSelectedPlace(p)} 
-                        variants={{
-                          hidden: { opacity: 0, y: 30, scale: 0.9 },
-                          show: { opacity: 1, y: 0, scale: 1 }
-                        }}
-                        whileHover={{ y: -6, backgroundColor: "#FFFFFF", borderColor: "rgba(255, 90, 95, 0.1)" }}
-                        whileTap={{ scale: 0.96 }}
-                        className="flex items-center gap-6 p-6 bg-[#F8F9FA] rounded-[44px] cursor-pointer transition-all border-2 border-transparent hover:shadow-2xl shadow-indigo-900/5 group relative overflow-hidden"
+                  <div>
+                    <div className="flex items-center justify-between mb-6 px-1">
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-2xl font-black text-text-headline tracking-tighter">
+                          {isDemoMode ? '성수동 에디터 픽' : '내 핫플'}
+                        </h2>
+                        {isDemoMode && <span className="bg-[#6B4EFF]/10 text-[#6B4EFF] px-2 py-1 rounded-md text-[10px] font-black uppercase">Demo</span>}
+                      </div>
+                      <div className="bg-gray-100 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-text-body shadow-inner">
+                        {visiblePlaces.length} 개
+                      </div>
+                    </div>
+                    {isDemoMode && (
+                      <button 
+                        onClick={handleToggleDemo}
+                        className="w-full mb-6 text-xs font-black text-primary bg-primary/10 py-3 rounded-2xl hover:bg-primary/20 transition-colors flex items-center justify-center gap-2"
                       >
-                        <div className="w-16 h-16 bg-white text-primary flex items-center justify-center rounded-[26px] shrink-0 shadow-sm border border-gray-100 group-hover:bg-primary group-hover:text-white transition-all transform group-hover:rotate-12 group-hover:shadow-lg shadow-primary/20">
-                          {(() => {
-                            const mainCatId = p.categories?.[0] || "other";
-                            const catInfo = CATEGORIES.find(c => c.id === mainCatId) || CATEGORIES[CATEGORIES.length - 1];
-                            const CatIcon = catInfo.icon;
-                            return <CatIcon size={28} strokeWidth={2.5} />;
-                          })()}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-black text-xl truncate text-text-headline tracking-tight mb-1">{p.name}</h4>
-                          <div className="flex items-center gap-1.5 opacity-60">
-                            <Navigation size={10} fill="currentColor" />
-                            <p className="text-[10px] text-text-body truncate uppercase tracking-[0.2em] font-black">{p.address}</p>
+                        <ArrowLeft size={14} /> 내 지도로 돌아가기
+                      </button>
+                    )}
+                    <motion.div 
+                      className="flex flex-col gap-4"
+                      initial="hidden"
+                      animate="show"
+                      variants={{
+                        hidden: { opacity: 0 },
+                        show: {
+                          opacity: 1,
+                          transition: { staggerChildren: 0.08 }
+                        }
+                      }}
+                    >
+                      {visiblePlaces.map(p => (
+                        <motion.div 
+                          key={p.id} 
+                          onClick={() => setSelectedPlace(p)} 
+                          variants={{
+                            hidden: { opacity: 0, y: 20, scale: 0.95 },
+                            show: { opacity: 1, y: 0, scale: 1 }
+                          }}
+                          whileHover={{ y: -4, backgroundColor: "#FFFFFF", borderColor: "rgba(255, 90, 95, 0.1)" }}
+                          whileTap={{ scale: 0.98 }}
+                          className="flex items-center gap-5 p-5 bg-[#F8F9FA] rounded-[36px] cursor-pointer transition-all border-2 border-transparent hover:shadow-xl shadow-indigo-900/5 group relative overflow-hidden"
+                        >
+                          <div className="w-14 h-14 bg-white text-primary flex items-center justify-center rounded-[22px] shrink-0 shadow-sm border border-gray-100 group-hover:bg-primary group-hover:text-white transition-all transform group-hover:rotate-12 group-hover:shadow-md shadow-primary/20">
+                            {(() => {
+                              const mainCatId = p.categories?.[0] || "other";
+                              const catInfo = CATEGORIES.find(c => c.id === mainCatId) || CATEGORIES[CATEGORIES.length - 1];
+                              const CatIcon = catInfo.icon;
+                              return <CatIcon size={24} strokeWidth={2.5} />;
+                            })()}
                           </div>
-                        </div>
-                        <div className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-all transform translate-x-4 group-hover:translate-x-0 border border-gray-50">
-                          <ExternalLink size={20} className="text-primary" />
-                        </div>
-                      </motion.div>
-                    ))}
-                  </motion.div>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-black text-lg truncate text-text-headline tracking-tight mb-1">{p.name}</h4>
+                            <div className="flex items-center gap-1.5 opacity-60">
+                              <Navigation size={10} fill="currentColor" />
+                              <p className="text-[10px] text-text-body truncate uppercase tracking-[0.2em] font-black">{p.address}</p>
+                            </div>
+                          </div>
+                          <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-all transform translate-x-4 group-hover:translate-x-0 border border-gray-50">
+                            <ExternalLink size={16} className="text-primary" />
+                          </div>
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  </div>
                 )}
               </div>
             )}
@@ -558,7 +677,7 @@ export default function Home() {
                 transition={{ type: "spring", damping: 25, stiffness: 200 }}
                 className="w-full sm:max-w-md bg-white rounded-t-[56px] sm:rounded-[56px] p-10 shadow-2xl flex flex-col max-h-[90vh] border-t border-gray-100"
               >
-                <div className="flex justify-between items-center mb-10">
+                <div className="flex justify-between items-center mb-8">
                   <div className="flex flex-col">
                     <span className="text-[10px] font-black uppercase tracking-[0.4em] text-primary mb-1">새로운 장소</span>
                     <h3 className="text-3xl font-black text-text-headline tracking-tighter italic leading-none">AI 자동 분석</h3>
@@ -567,12 +686,33 @@ export default function Home() {
                     <X size={24} strokeWidth={3} />
                   </button>
                 </div>
-                {!analyzedPlaces.length ? (
+                
+                {isLoading ? (
+                  <div className="flex flex-col items-center justify-center py-12 animate-in fade-in duration-500">
+                    <motion.div 
+                      animate={{ scale: [1, 1.15, 1], opacity: [0.7, 1, 0.7] }} 
+                      transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
+                      className="w-24 h-24 bg-indigo-50 rounded-[36px] flex items-center justify-center mb-8 text-[#6B4EFF] shadow-xl shadow-indigo-500/10 border-2 border-[#6B4EFF]/10"
+                    >
+                      <Sparkles size={48} strokeWidth={2.5} />
+                    </motion.div>
+                    <h4 className="text-2xl font-black text-text-headline mb-3 tracking-tight">AI 분석 중</h4>
+                    <p className="text-sm font-bold text-text-body text-center leading-relaxed mb-10">
+                      핫플의 숨겨진 매력과 위치를<br/>똑똑하게 찾아내고 있어요 ✨
+                    </p>
+                    
+                    <div className="w-full space-y-4">
+                      <div className="w-full h-20 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 rounded-[24px] animate-pulse bg-[length:200%_100%]" />
+                      <div className="w-3/4 h-6 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 rounded-full animate-pulse bg-[length:200%_100%]" />
+                      <div className="w-1/2 h-6 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 rounded-full animate-pulse bg-[length:200%_100%]" />
+                    </div>
+                  </div>
+                ) : !analyzedPlaces.length ? (
                   <>
-                    <div className="relative mb-10 group">
+                    <div className="relative mb-8 group">
                       <textarea 
-                        placeholder="인스타 게시물 내용을 이곳에 붙여넣으세요..."
-                        className="w-full bg-gray-50/50 p-8 rounded-[40px] min-h-[220px] resize-none outline-none ring-4 ring-transparent focus:ring-primary/5 focus:bg-white transition-all text-base font-bold leading-relaxed border-2 border-gray-100 focus:border-primary/20 placeholder:text-gray-300"
+                        placeholder="인스타 링크 또는 게시물 내용을 여기에 붙여넣으세요..."
+                        className="w-full bg-gray-50/50 p-8 rounded-[40px] min-h-[200px] resize-none outline-none ring-4 ring-transparent focus:ring-primary/5 focus:bg-white transition-all text-base font-bold leading-relaxed border-2 border-gray-100 focus:border-primary/20 placeholder:text-gray-300"
                         value={urlInput}
                         onChange={(e) => setUrlInput(e.target.value)}
                       />
@@ -584,7 +724,7 @@ export default function Home() {
                       disabled={isLoading}
                       className="w-full bg-gradient-to-br from-[#6B4EFF] to-[#8B74FF] text-white py-6 rounded-[32px] font-black flex justify-center items-center gap-3 shadow-2xl shadow-indigo-500/30 hover:brightness-110 disabled:opacity-50 active:scale-95 transition-all text-xl tracking-tight"
                     >
-                      {isLoading ? <><Loader2 className="animate-spin" size={28} strokeWidth={3} /> 분석 중...</> : "분석 시작하기"}
+                      분석 시작하기
                     </button>
                   </>
                 ) : (
@@ -610,7 +750,7 @@ export default function Home() {
                           </div>
                           <button 
                             onClick={() => handleSave(place)}
-                            className="w-full bg-primary text-white py-4.5 rounded-[24px] text-base font-black shadow-xl shadow-primary/20 hover:brightness-110 active:scale-95 transition-all uppercase tracking-widest py-4"
+                            className="w-full bg-primary text-white rounded-[24px] text-base font-black shadow-xl shadow-primary/20 hover:brightness-110 active:scale-95 transition-all uppercase tracking-widest py-4"
                           >
                             내 지도에 추가하기
                           </button>
