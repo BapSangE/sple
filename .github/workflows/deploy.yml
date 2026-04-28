@@ -48,6 +48,8 @@ jobs:
           environment-variables: |
             DATABASE_URL=${{ secrets.DATABASE_URL }}
             GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+            GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
 
       # 3. 여기도 v1 -> v2 로 올려줍니다.
       - name: Deploy to Amazon ECS

@@ -58,8 +58,9 @@ export default function Home() {
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
     try {
-      const emailParam = session?.user?.email ? `&user_email=${encodeURIComponent(session.user.email)}` : '';
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search?q=${encodeURIComponent(query)}${emailParam}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search?q=${encodeURIComponent(query)}`, {
+        headers: { "Authorization": `Bearer ${(session as any)?.accessToken || ""}` }
+      });
       const data = await res.json();
       if (data.status === "success") {
         setPlaces(data.data);
@@ -141,16 +142,24 @@ export default function Home() {
   useEffect(() => {
     if (status === "loading") return;
     const fetchPlaces = async () => {
+      if (!session) {
+        setPlaces([]);
+        return;
+      }
       try {
-        const emailParam = session?.user?.email ? `?user_email=${encodeURIComponent(session.user.email)}` : '';
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/places${emailParam}`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/places`, {
+          headers: { "Authorization": `Bearer ${(session as any)?.accessToken || ""}` }
+        });
         const data = await res.json();
         if (data.status === "success") {
           setPlaces(data.data);
           setHasFirstPlace(data.data.length > 0);
+        } else {
+          setPlaces([]);
         }
       } catch (err) {
         console.error("Failed to load places", err);
+        setPlaces([]);
       }
     };
     fetchPlaces();
@@ -179,6 +188,11 @@ export default function Home() {
   };
 
   const handleSave = async (place: Place) => {
+    if (!session) {
+      alert("로그인이 필요합니다.");
+      signIn("google");
+      return;
+    }
     try {
       let lat = place.lat;
       let lng = place.lng;
@@ -199,7 +213,10 @@ export default function Home() {
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/save-place`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${(session as any)?.accessToken || ""}`
+        },
         body: JSON.stringify({ ...place, url: urlInput, lat, lng, user_email: session?.user?.email }),
       });
       const data = await res.json();

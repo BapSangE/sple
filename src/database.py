@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base, Mapped, mapped_column
-from sqlalchemy import String, Float, Text, DateTime, func
+from sqlalchemy import String, Float, Text, DateTime, func, ForeignKey
 from typing import Optional
 import os
 from dotenv import load_dotenv
@@ -32,10 +32,12 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    google_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     name: Mapped[Optional[str]] = mapped_column(String)
     profile_image: Mapped[Optional[str]] = mapped_column(String)
     created_at: Mapped[Optional[str]] = mapped_column(DateTime, server_default=func.now())
+    last_login: Mapped[Optional[str]] = mapped_column(DateTime)
 
 class Place(Base):
     __tablename__ = "places"
@@ -54,6 +56,7 @@ class Place(Base):
     image_url: Mapped[Optional[str]] = mapped_column(String)
     detailed_highlights: Mapped[Optional[str]] = mapped_column(Text)
     user_email: Mapped[Optional[str]] = mapped_column(String)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[Optional[str]] = mapped_column(DateTime, server_default=func.now())
 
 async def init_db():

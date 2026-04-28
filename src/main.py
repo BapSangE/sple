@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 import os
@@ -12,12 +13,14 @@ from bs4 import BeautifulSoup
 from google import genai
 import json
 import re
+import jwt
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import or_
 
 from database import init_db, get_db, async_session, Place
+import auth
 
 # .env 파일 로드
 load_dotenv()
@@ -33,6 +36,21 @@ IG_PAGE_ACCESS_TOKEN = os.getenv("IG_PAGE_ACCESS_TOKEN")
 # 배포 도메인으로 업데이트
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://sple-insta.com")
 
+JWT_SECRET = os.getenv("NEXTAUTH_SECRET", os.getenv("JWT_SECRET", "super-secret-key-change-me-later"))
+ALGORITHM = "HS256"
+
+security = HTTPBearer(auto_error=False)
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
+        return payload
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
 client = None
 if GEMINI_API_KEY:
     client = genai.Client(api_key=GEMINI_API_KEY)
@@ -46,6 +64,9 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="Sple API Server", lifespan=lifespan)
+
+# 라우터 등록
+app.include_router(auth.router)
 
 # CORS 설정: 운영 도메인 허용
 app.add_middleware(
@@ -199,12 +220,11 @@ async def share_target(request: Request, text: str = None, url: str = None):
     return RedirectResponse(url=redirect_url)
 
 @app.get("/api/places")
-async def get_places(user_email: str = None, db: AsyncSession = Depends(get_db)):
-    """저장된 모든 장소 목록을 반환합니다."""
+async def get_places(user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """로그인된 사용자의 저장된 장소 목록을 반환합니다."""
     try:
-        stmt = select(Place).order_by(Place.created_at.desc())
-        if user_email:
-            stmt = stmt.where(Place.user_email == user_email)
+        user_email = user.get("email")
+        stmt = select(Place).where(Place.user_email == user_email).order_by(Place.created_at.desc())
             
         result = await db.execute(stmt)
         places = result.scalars().all()
@@ -238,7 +258,7 @@ async def analyze_place_api(request: PlaceRequest):
     return JSONResponse(content={"status": "success", "data": extracted_data})
 
 @app.post("/api/save-place")
-async def save_place_api(request: PlaceSaveRequest, db: AsyncSession = Depends(get_db)):
+async def save_place_api(request: PlaceSaveRequest, user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """장소 데이터를 DB에 저장합니다."""
     try:
         new_place = Place(
@@ -252,7 +272,8 @@ async def save_place_api(request: PlaceSaveRequest, db: AsyncSession = Depends(g
             tags=json.dumps(request.tags),
             categories=json.dumps(request.categories),
             detailed_highlights=request.detailed_highlights,
-            user_email=request.user_email
+            user_email=user.get("email"),
+            user_id=int(user.get("sub")) if user.get("sub") else None
         )
         db.add(new_place)
         await db.commit()
@@ -263,19 +284,18 @@ async def save_place_api(request: PlaceSaveRequest, db: AsyncSession = Depends(g
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
 
 @app.get("/api/search")
-async def search_places(q: str = "", user_email: str = None, db: AsyncSession = Depends(get_db)):
+async def search_places(q: str = "", user: dict = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """장소 검색 API"""
     if not q:
-        return await get_places(user_email=user_email, db=db)
+        return await get_places(user=user, db=db)
         
     try:
+        user_email = user.get("email")
         query = f"%{q}%"
         stmt = select(Place).where(
+            Place.user_email == user_email,
             or_(Place.name.ilike(query), Place.address.ilike(query))
         ).order_by(Place.created_at.desc())
-        
-        if user_email:
-            stmt = stmt.where(Place.user_email == user_email)
             
         result = await db.execute(stmt)
         places = result.scalars().all()
