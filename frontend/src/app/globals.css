@@ -4,12 +4,28 @@
   --color-primary: #FF5A5F;
   --color-secondary: #6B4EFF;
   --color-tertiary: #00D09E;
-  --color-background: #F7F8FA;
-  --color-surface: #FFFFFF;
-  --color-text-headline: #1E1E1E;
-  --color-text-body: #868E96;
+  --color-background: var(--bg-color, #F7F8FA);
+  --color-surface: var(--surface-color, #FFFFFF);
+  --color-text-headline: var(--text-headline-color, #1E1E1E);
+  --color-text-body: var(--text-body-color, #868E96);
   --font-manrope: var(--font-manrope);
   --font-inter: var(--font-inter);
+}
+
+:root {
+  --bg-color: #F7F8FA;
+  --surface-color: #FFFFFF;
+  --text-headline-color: #1E1E1E;
+  --text-body-color: #868E96;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-color: #121212;
+    --surface-color: #1E1E1E;
+    --text-headline-color: #F7F8FA;
+    --text-body-color: #A0AAB2;
+  }
 }
 
 body {

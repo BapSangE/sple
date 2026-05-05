@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
-import { Map, CustomOverlayMap, useKakaoLoader } from "react-kakao-maps-sdk";
-import { motion, AnimatePresence } from "framer-motion";
+import { Map, CustomOverlayMap, useKakaoLoader, MarkerClusterer } from "react-kakao-maps-sdk";
+import { motion, AnimatePresence, useDragControls } from "framer-motion";
 import { 
   Plus, X, Loader2, Navigation, Bookmark, ArrowLeft, Search, 
   Coffee, Utensils, Wine, ShoppingBag, Camera, Trees, Hotel, 
   Globe, Sparkles, Check, Map as MapIcon, ExternalLink,
-  Link as LinkIcon, Play
+  Link as LinkIcon, Play, Minus, LocateFixed, ChevronDown, ChevronUp
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -98,6 +98,15 @@ export default function Home() {
   // Phase 2 & 3 States
   const [isMiniFabOpen, setIsMiniFabOpen] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
+  const [isBottomSheetMinimized, setIsBottomSheetMinimized] = useState(false);
+  const [mapInstance, setMapInstance] = useState<any>(null);
+  
+  // Custom Toast State
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
@@ -162,8 +171,11 @@ export default function Home() {
           });
         },
         (err) => {
-          console.warn("Geolocation failed", err);
-        }
+          console.warn("Geolocation failed, using fallback", err);
+          showToast("위치 권한이 거부되어 기본 위치로 이동합니다.");
+          setMapCenter({ lat: 37.5665, lng: 126.9780 });
+        },
+        { timeout: 5000 }
       );
     }
 
@@ -217,7 +229,8 @@ export default function Home() {
         
         if (res.status === 401) {
           console.warn("토큰이 만료되었거나 유효하지 않습니다.");
-          signOut();
+          showToast("세션이 만료되었습니다. 다시 로그인해주세요.");
+          setTimeout(() => signOut(), 1500);
           return;
         }
         
@@ -258,14 +271,23 @@ export default function Home() {
         credentials: "include",
         body: JSON.stringify({ url: urlInput }),
       });
+      if (!res.ok) {
+        if (res.status === 500 || res.status === 429) {
+          showToast("서버 연결이 원활하지 않거나 호출 한도를 초과했습니다. 잠시 후 시도해주세요.");
+        } else {
+          showToast("분석 서버와의 통신에 실패했습니다.");
+        }
+        setIsLoading(false);
+        return;
+      }
       const data = await res.json();
       if (data.status === "success") {
         setAnalyzedPlaces(data.data);
       } else {
-        alert(data.message || "분석에 실패했습니다.");
+        showToast(data.message || "분석에 실패했습니다. 올바른 게시물인지 확인해주세요.");
       }
     } catch (error) {
-      alert("서버 연결에 실패했습니다.");
+      showToast("서버 연결에 실패했습니다. 네트워크 상태를 확인해주세요.");
     } finally {
       setIsLoading(false);
     }
@@ -273,15 +295,15 @@ export default function Home() {
 
   const handleSave = async (place: Place) => {
     if (!session) {
-      alert("로그인이 필요합니다.");
+      showToast("로그인이 필요합니다.");
       signIn("google");
       return;
     }
     
     const token = (session as any)?.accessToken;
     if (!token) {
-      alert("로그인 정보가 만료되었습니다. 다시 로그인해주세요.");
-      signOut();
+      showToast("로그인 정보가 만료되었습니다. 다시 로그인해주세요.");
+      setTimeout(() => signOut(), 1500);
       return;
     }
 
@@ -314,14 +336,14 @@ export default function Home() {
       });
       
       if (res.status === 401) {
-        alert("인증이 만료되었습니다. 다시 로그인해주세요.");
-        signOut();
+        showToast("인증이 만료되었습니다. 다시 로그인해주세요.");
+        setTimeout(() => signOut(), 1500);
         return;
       }
       
       const data = await res.json();
       if (data.status === "success") {
-        alert(`'${place.name}' 장소가 저장되었습니다!`);
+        showToast(`'${place.name}' 장소가 저장되었습니다!`);
         // If in demo mode, switch back to real mode to see the saved place
         if (isDemoMode) setIsDemoMode(false);
         setPlaces(prev => [{ ...place, id: Date.now().toString(), lat, lng, url: urlInput }, ...prev]);
@@ -330,10 +352,10 @@ export default function Home() {
         setUrlInput("");
         setAnalyzedPlaces([]);
       } else {
-        alert(data.message);
+        showToast(data.message);
       }
     } catch (error) {
-      alert("저장 중 오류가 발생했습니다.");
+      showToast("저장 중 오류가 발생했습니다.");
     }
   };
 
@@ -341,6 +363,21 @@ export default function Home() {
 
   return (
     <div className="relative w-full h-full flex justify-center bg-gray-100 sm:items-center sm:py-10">
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
+            exit={{ opacity: 0, y: -20, x: "-50%" }}
+            className="fixed top-6 left-1/2 z-[200] bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl text-sm font-bold flex items-center gap-2 tracking-tight whitespace-nowrap border border-gray-700/50"
+          >
+            <Sparkles size={16} className="text-primary" />
+            {toastMessage}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="relative w-full h-full max-w-[430px] sm:h-[90vh] bg-surface sm:rounded-[40px] sm:shadow-2xl sm:border-[8px] sm:border-gray-200 overflow-hidden flex flex-col">
         {/* Header */}
         <header className="absolute top-0 w-full z-50 glass border-b border-white/20 flex flex-col pt-4 shadow-lg shadow-black/5">
@@ -368,30 +405,35 @@ export default function Home() {
               </button>
             )}
           </div>
-          <div className="flex overflow-x-auto px-6 pb-4 no-scrollbar gap-2.5 scroll-smooth">
-            {CATEGORIES.map((cat) => {
-              const Icon = cat.icon;
-              const isActive = selectedCategoryId === cat.id;
-              const isDisabled = isDataEmpty;
-              
-              return (
-                <button
-                  key={cat.id}
-                  disabled={isDisabled}
-                  onClick={() => setSelectedCategoryId(cat.id)}
-                  className={`flex items-center gap-1.5 px-5 py-2.5 rounded-full text-xs font-black whitespace-nowrap transition-all border-2 ${
-                    isDisabled 
-                      ? "opacity-30 pointer-events-none bg-white/80 text-text-body border-transparent"
-                      : isActive 
-                        ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-105" 
-                        : "bg-white/80 text-text-body border-transparent hover:border-gray-200"
-                  }`}
-                >
-                  <Icon size={14} strokeWidth={3} />
-                  {cat.label}
-                </button>
-              );
-            })}
+          <div className="relative">
+            <div className="flex overflow-x-auto px-6 pb-4 no-scrollbar gap-2.5 scroll-smooth">
+              {CATEGORIES.map((cat) => {
+                const Icon = cat.icon;
+                const isActive = selectedCategoryId === cat.id;
+                const isDisabled = isDataEmpty;
+                
+                return (
+                  <button
+                    key={cat.id}
+                    disabled={isDisabled}
+                    onClick={() => setSelectedCategoryId(cat.id)}
+                    className={`flex items-center gap-1.5 px-5 py-2.5 rounded-full text-xs font-black whitespace-nowrap transition-all border-2 ${
+                      isDisabled 
+                        ? "opacity-30 pointer-events-none bg-white/80 text-text-body border-transparent"
+                        : isActive 
+                          ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-105" 
+                          : "bg-white/80 text-text-body border-transparent hover:border-gray-200"
+                    }`}
+                  >
+                    <Icon size={14} strokeWidth={3} />
+                    {cat.label}
+                  </button>
+                );
+              })}
+            </div>
+            {!isDataEmpty && (
+              <div className="absolute right-0 top-0 bottom-4 w-12 bg-gradient-to-l from-[#F3F4F6] via-[#F3F4F6]/80 to-transparent pointer-events-none rounded-r-3xl" />
+            )}
           </div>
         </header>
 
@@ -401,30 +443,64 @@ export default function Home() {
             center={mapCenter}
             style={{ width: "100%", height: "100%" }}
             level={7}
+            onCreate={setMapInstance}
             onIdle={(map) => setMapBounds(map.getBounds())}
           >
-            {visiblePlaces.map((p) => {
-              const mainCatId = p.categories?.[0] || "other";
-              const catInfo = CATEGORIES.find(c => c.id === mainCatId) || CATEGORIES[CATEGORIES.length - 1];
-              const CatIcon = catInfo.icon;
-              const isSelected = selectedPlace?.id === p.id;
+            <MarkerClusterer averageCenter={true} minLevel={5}>
+              {visiblePlaces.map((p) => {
+                const mainCatId = p.categories?.[0] || "other";
+                const catInfo = CATEGORIES.find(c => c.id === mainCatId) || CATEGORIES[CATEGORIES.length - 1];
+                const CatIcon = catInfo.icon;
+                const isSelected = selectedPlace?.id === p.id;
 
-              return p.lat && p.lng && (
-                <CustomOverlayMap key={p.id} position={{ lat: p.lat, lng: p.lng }} yAnchor={1}>
-                  <div 
-                    className={`marker-pin ${isSelected ? 'marker-selected' : ''}`}
-                    onClick={() => setSelectedPlace(p)}
-                  >
-                    <div className="marker-icon">
-                      <CatIcon size={20} strokeWidth={2.5} />
+                return p.lat && p.lng && (
+                  <CustomOverlayMap key={p.id} position={{ lat: p.lat, lng: p.lng }} yAnchor={1}>
+                    <div 
+                      className={`marker-pin ${isSelected ? 'marker-selected' : ''}`}
+                      onClick={() => setSelectedPlace(p)}
+                    >
+                      <div className="marker-icon">
+                        <CatIcon size={20} strokeWidth={2.5} />
+                      </div>
                     </div>
-                  </div>
-                </CustomOverlayMap>
-              );
-            })}
+                  </CustomOverlayMap>
+                );
+              })}
+            </MarkerClusterer>
           </Map>
 
-          <div className="absolute bottom-[240px] right-6 flex flex-col items-end z-40">
+          {/* Map Controls */}
+          <div className="absolute top-[100px] right-4 flex flex-col gap-2 z-40">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 flex flex-col overflow-hidden">
+              <button 
+                onClick={() => mapInstance && mapInstance.setLevel(mapInstance.getLevel() - 1)}
+                className="w-11 h-11 flex items-center justify-center text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors border-b border-gray-100"
+              >
+                <Plus size={20} strokeWidth={2.5} />
+              </button>
+              <button 
+                onClick={() => mapInstance && mapInstance.setLevel(mapInstance.getLevel() + 1)}
+                className="w-11 h-11 flex items-center justify-center text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+              >
+                <Minus size={20} strokeWidth={2.5} />
+              </button>
+            </div>
+            <button 
+              onClick={() => {
+                if (navigator.geolocation) {
+                  navigator.geolocation.getCurrentPosition(pos => {
+                    setMapCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                    if (mapInstance) mapInstance.setLevel(5);
+                  });
+                }
+              }}
+              className="w-11 h-11 bg-white rounded-2xl shadow-lg border border-gray-100 flex items-center justify-center text-primary hover:bg-gray-50 active:bg-gray-100 transition-colors mt-1"
+            >
+              <LocateFixed size={20} strokeWidth={2.5} />
+            </button>
+          </div>
+
+          <div className="absolute bottom-[280px] right-6 flex flex-col items-end z-40">
             <AnimatePresence>
               {isMiniFabOpen && (
                 <motion.div 
@@ -463,14 +539,20 @@ export default function Home() {
         {/* Bottom Sheet */}
         <motion.div 
           className="absolute bottom-0 w-full bg-white rounded-t-[48px] shadow-[0_-20px_60px_rgba(0,0,0,0.15)] z-50 flex flex-col border-t border-gray-50"
-          animate={{ height: selectedPlace ? '75%' : (isDataEmpty ? '280px' : '220px') }}
+          animate={{ height: isBottomSheetMinimized ? '80px' : (selectedPlace ? '75%' : (isDataEmpty ? '280px' : '220px')) }}
           transition={{ type: "spring", damping: 30, stiffness: 150 }}
         >
-          <div className="w-full flex justify-center py-6 cursor-pointer absolute top-0 z-10" onClick={() => setSelectedPlace(null)}>
-            <div className="w-16 h-1.5 bg-gray-200/80 rounded-full" />
+          <div 
+            className="w-full flex justify-center py-6 cursor-pointer absolute top-0 z-10 group" 
+            onClick={() => setIsBottomSheetMinimized(!isBottomSheetMinimized)}
+          >
+            <div className="w-16 h-1.5 bg-gray-200/80 rounded-full group-hover:bg-gray-300 transition-colors" />
+            <div className="absolute right-6 top-5 text-gray-400">
+              {isBottomSheetMinimized ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+            </div>
           </div>
           
-          <div className="px-8 pb-10 overflow-y-auto flex-1 custom-scrollbar pt-12">
+          <div className={`px-8 pb-10 overflow-y-auto flex-1 custom-scrollbar pt-12 ${isBottomSheetMinimized ? 'opacity-0 pointer-events-none' : 'opacity-100'} transition-opacity duration-300`}>
             {selectedPlace ? (
               <div className="animate-in fade-in slide-in-from-bottom-6 duration-500">
                 <button 
@@ -558,9 +640,20 @@ export default function Home() {
             ) : (
               <div>
                 {isDataEmpty ? (
-                  <div className="flex flex-col items-center justify-center animate-in fade-in duration-700">
-                    <div className="w-14 h-14 bg-[#F2F2F2] rounded-3xl flex items-center justify-center text-text-headline mb-4 shadow-sm">
-                      <Camera size={28} />
+                  <div className="flex flex-col items-center justify-center animate-in fade-in duration-700 relative">
+                    {/* Onboarding Tooltip */}
+                    <motion.div 
+                      initial={{ y: 10, opacity: 0 }}
+                      animate={{ y: [0, -8, 0], opacity: 1 }}
+                      transition={{ y: { repeat: Infinity, duration: 2, ease: "easeInOut" }, opacity: { duration: 0.5 } }}
+                      className="absolute -top-14 bg-secondary text-white px-4 py-2 rounded-2xl text-xs font-bold shadow-lg shadow-secondary/20 flex items-center gap-2"
+                    >
+                      <span>지금 바로 링크를 공유해보세요!</span>
+                      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-secondary" />
+                    </motion.div>
+
+                    <div className="w-14 h-14 bg-[#F2F2F2] rounded-3xl flex items-center justify-center text-text-headline mb-4 shadow-sm relative overflow-hidden">
+                      <LinkIcon size={28} className="absolute rotate-45 text-primary" />
                     </div>
                     <h3 className="font-black text-[22px] tracking-tighter mb-2 text-center text-text-headline leading-tight">
                       인스타 핫플을<br/>가장 쉽게 저장하세요
@@ -709,22 +802,24 @@ export default function Home() {
                   </div>
                 ) : !analyzedPlaces.length ? (
                   <>
-                    <div className="relative mb-8 group">
-                      <textarea 
-                        placeholder="인스타 링크 또는 게시물 내용을 여기에 붙여넣으세요..."
-                        className="w-full bg-gray-50/50 p-8 rounded-[40px] min-h-[200px] resize-none outline-none ring-4 ring-transparent focus:ring-primary/5 focus:bg-white transition-all text-base font-bold leading-relaxed border-2 border-gray-100 focus:border-primary/20 placeholder:text-gray-300"
+                    <div className="relative mb-6 group">
+                      <label className="block text-xs font-black text-text-body mb-2 uppercase tracking-widest pl-2">인스타그램 링크</label>
+                      <input 
+                        type="text"
+                        placeholder="https://www.instagram.com/p/..."
+                        className="w-full bg-gray-50/80 px-6 py-5 rounded-[24px] outline-none ring-4 ring-transparent focus:ring-primary/10 focus:bg-white transition-all text-sm font-bold text-gray-700 border-2 border-gray-100 focus:border-primary/30"
                         value={urlInput}
                         onChange={(e) => setUrlInput(e.target.value)}
                       />
-                      <div className="absolute bottom-6 right-8 text-[10px] font-black text-gray-300 uppercase tracking-widest">입력을 기다리는 중...</div>
                     </div>
                     <button 
                       id="analyze-btn"
                       onClick={handleAnalyze}
                       disabled={isLoading}
-                      className="w-full bg-gradient-to-br from-[#6B4EFF] to-[#8B74FF] text-white py-6 rounded-[32px] font-black flex justify-center items-center gap-3 shadow-2xl shadow-indigo-500/30 hover:brightness-110 disabled:opacity-50 active:scale-95 transition-all text-xl tracking-tight"
+                      className="w-full bg-gradient-to-br from-[#6B4EFF] to-[#8B74FF] text-white py-5 rounded-[28px] font-black flex justify-center items-center gap-3 shadow-2xl shadow-indigo-500/30 hover:brightness-110 disabled:opacity-50 active:scale-95 transition-all text-lg tracking-tight mt-auto"
                     >
-                      분석 시작하기
+                      <Sparkles size={20} fill="currentColor" />
+                      AI 분석 시작하기
                     </button>
                   </>
                 ) : (
