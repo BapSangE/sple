@@ -58,6 +58,9 @@ async def google_login(request: GoogleLoginRequest, db: AsyncSession = Depends(g
         result = await db.execute(select(User).where(User.google_id == google_id))
         user = result.scalars().first()
         
+        # Current time as naive datetime for DB compatibility
+        now_naive = datetime.now(timezone.utc).replace(tzinfo=None)
+        
         if not user:
             # Create new user
             user = User(
@@ -65,14 +68,14 @@ async def google_login(request: GoogleLoginRequest, db: AsyncSession = Depends(g
                 email=email,
                 name=name,
                 profile_image=picture,
-                last_login=datetime.now(timezone.utc)
+                last_login=now_naive
             )
             db.add(user)
             await db.commit()
             await db.refresh(user)
         else:
             # Update last login
-            user.last_login = datetime.now(timezone.utc)
+            user.last_login = now_naive
             await db.commit()
             
         # Create JWT access token

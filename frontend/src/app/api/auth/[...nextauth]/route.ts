@@ -13,7 +13,7 @@ export const authOptions: NextAuthOptions = {
       // 최초 로그인 시 account 객체가 존재하며 id_token을 포함합니다.
       if (account && account.id_token) {
         try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
           const res = await fetch(`${apiUrl}/api/auth/google`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
