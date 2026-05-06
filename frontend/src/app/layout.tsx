@@ -1,11 +1,19 @@
 import type { Metadata } from "next";
-import { Manrope, Inter } from "next/font/google";
-import Script from "next/script";
+import { Epilogue, Be_Vietnam_Pro } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 
-const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope" });
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const epilogue = Epilogue({ 
+  subsets: ["latin"], 
+  variable: "--font-epilogue",
+  weight: ["600", "700"]
+});
+
+const beVietnamPro = Be_Vietnam_Pro({ 
+  subsets: ["latin"], 
+  variable: "--font-be-vietnam-pro",
+  weight: ["400", "500", "700"]
+});
 
 export const metadata: Metadata = {
   title: "Sple - 나만의 핫플 지도",
@@ -32,8 +40,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
-      <body className={`${manrope.variable} ${inter.variable} font-sans antialiased h-screen flex flex-col`}>
+    <html lang="ko" className="dark">
+      <head>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" />
+      </head>
+      <body className={`${epilogue.variable} ${beVietnamPro.variable} font-body antialiased h-screen flex flex-col bg-map-bg text-on-surface`}>
         <script
           dangerouslySetInnerHTML={{
             __html: `

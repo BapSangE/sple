@@ -34,9 +34,9 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (session?.user) {
-        // @ts-ignore
+        // @ts-expect-error: Custom properties on session
         session.accessToken = token.accessToken;
-        // @ts-ignore
+        // @ts-expect-error: Custom properties on user
         session.user.id = token.user_id;
       }
       return session;
