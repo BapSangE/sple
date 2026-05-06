@@ -523,13 +523,15 @@ export default function Home() {
         {/* Header */}
         <header className="absolute top-0 w-full z-50 glass border-b border-white/20 flex flex-col pt-4 shadow-lg shadow-black/5">
           <div className="flex items-center justify-between px-6 mb-4 gap-4">
-            <h1 className="font-manrope font-black text-3xl text-primary shrink-0 tracking-tighter italic leading-none">Sple</h1>
+            <div className="flex items-center justify-center w-8 h-8 text-[#FF6B6B] shrink-0">
+              <MapPin size={32} fill="currentColor" />
+            </div>
             <div className="flex-1 relative group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-body group-focus-within:text-primary transition-colors" size={18} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 group-focus-within:text-white transition-colors" size={18} />
               <input 
                 type="text" 
                 placeholder="어디로 갈까요?" 
-                className="w-full bg-white/50 py-2.5 pl-10 pr-4 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary/10 focus:bg-white transition-all border border-gray-100 focus:border-primary/30 shadow-inner"
+                className="w-full bg-zinc-800 py-2.5 pl-10 pr-4 rounded-full text-sm font-bold outline-none focus:ring-4 focus:ring-primary/20 focus:border-primary/50 transition-all text-white placeholder-zinc-400"
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
                 onKeyDown={(e) => {
