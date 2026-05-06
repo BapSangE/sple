@@ -592,7 +592,7 @@ export default function Home() {
                         ? "opacity-30 pointer-events-none bg-white/80 text-text-body border-transparent"
                         : isActive 
                           ? "bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-105" 
-                          : "bg-white/80 text-text-body border-transparent hover:border-gray-200"
+                          : "bg-white text-gray-700 border-gray-300 hover:border-primary/50 shadow-sm"
                     }`}
                   >
                     <Icon size={14} strokeWidth={3} />
@@ -862,12 +862,11 @@ export default function Home() {
                   <div className="flex flex-col items-center justify-center animate-in fade-in duration-700 relative">
                     {/* Onboarding Tooltip */}
                     <motion.div 
-                      initial={{ y: 10, opacity: 0 }}
-                      animate={{ y: [0, -8, 0], opacity: 1 }}
-                      transition={{ y: { repeat: Infinity, duration: 2, ease: "easeInOut" }, opacity: { duration: 0.5 } }}
-                      className="absolute -top-14 bg-secondary text-white px-4 py-2 rounded-2xl text-xs font-bold shadow-lg shadow-secondary/20 flex items-center gap-2"
-                    >
-                      <span>지금 바로 링크를 공유해보세요!</span>
+                    initial={{ y: 10, opacity: 0 }}
+                    animate={{ y: [0, -8, 0], opacity: 1 }}
+                    transition={{ y: { repeat: Infinity, duration: 2, ease: "easeInOut" }, opacity: { duration: 0.5 } }}
+                    className="absolute -top-20 z-[60] bg-secondary text-white px-4 py-2 rounded-2xl text-xs font-bold shadow-lg shadow-secondary/20 flex items-center gap-2"
+                    >                      <span>지금 바로 링크를 공유해보세요!</span>
                       <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-secondary" />
                     </motion.div>
 
