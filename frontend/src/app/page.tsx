@@ -8,7 +8,7 @@ import {
   Plus, X, Loader2, Navigation, Bookmark, ArrowLeft, Search, 
   Coffee, Utensils, Wine, ShoppingBag, Camera, Trees, Hotel, 
   Globe, Sparkles, Check, Map as MapIcon, ExternalLink,
-  Link as LinkIcon, Play, Minus, LocateFixed, ChevronDown, ChevronUp
+  Link as LinkIcon, Play, Minus, LocateFixed, ChevronDown, ChevronUp, WifiOff, ClipboardPaste, MapPin
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -72,6 +72,9 @@ interface Place {
   rating: number;
   categories: string[];
   detailed_highlights?: string;
+  memo?: string;
+  folder?: string;
+  image_url?: string;
 }
 
 export default function Home() {
@@ -88,34 +91,109 @@ export default function Home() {
   const [urlInput, setUrlInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [analyzedPlaces, setAnalyzedPlaces] = useState<Place[]>([]);
+  const [memoInputs, setMemoInputs] = useState<Record<number, string>>({});
+  const [folderInputs, setFolderInputs] = useState<Record<number, string>>({});
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 37.5665, lng: 126.9780 }); // Default: Seoul
   const [mapBounds, setMapBounds] = useState<any>(null);
   const [visiblePlaces, setVisiblePlaces] = useState<Place[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategoryId, setSelectedCategoryId] = useState("all");
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>(["all"]);
   
   // Phase 2 & 3 States
+  const [isListView, setIsListView] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [isMiniFabOpen, setIsMiniFabOpen] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [isBottomSheetMinimized, setIsBottomSheetMinimized] = useState(false);
   const [mapInstance, setMapInstance] = useState<any>(null);
   
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    });
+  }, []);
+  
+  const [isOnline, setIsOnline] = useState(true);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIsOnline(navigator.onLine);
+      const handleOnline = () => setIsOnline(true);
+      const handleOffline = () => setIsOnline(false);
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      };
+    }
+  }, []);
+
   // Custom Toast State
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const showToast = (msg: string) => {
+  
+  const triggerHaptic = (type: 'light' | 'medium' | 'success' | 'error' = 'light') => {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      switch (type) {
+        case 'light': navigator.vibrate(10); break;
+        case 'medium': navigator.vibrate(30); break;
+        case 'success': navigator.vibrate([20, 50, 20]); break;
+        case 'error': navigator.vibrate([50, 50, 50, 50]); break;
+      }
+    }
+  };
+
+  const showToast = (msg: string, type: 'light' | 'medium' | 'success' | 'error' = 'light') => {
+    triggerHaptic(type);
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
+  useEffect(() => {
+    const savedHistory = localStorage.getItem("spleSearchHistory");
+    if (savedHistory) {
+      try {
+        setSearchHistory(JSON.parse(savedHistory));
+      } catch (e) {}
+    }
+  }, []);
+
+  const handleSearchSubmit = (query: string) => {
+    if (!query.trim()) return;
+    const newHistory = [query.trim(), ...searchHistory.filter(h => h !== query.trim())].slice(0, 5);
+    setSearchHistory(newHistory);
+    localStorage.setItem("spleSearchHistory", JSON.stringify(newHistory));
+    handleSearch(query);
+  };
+
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
-    if (isDemoMode) {
-      if (!query) {
+    if (!query) {
+      const token = (session as any)?.accessToken;
+      if (token && !isDemoMode) {
+        // Fetch all places when query is empty
+        try {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/places`, {
+            headers: { "Authorization": `Bearer ${token}` },
+            credentials: "include"
+          });
+          const data = await res.json();
+          if (data.status === "success") {
+            setPlaces(data.data);
+          }
+        } catch (err) {}
+      } else if (isDemoMode) {
         setPlaces(DEMO_PLACES);
-      } else {
-        setPlaces(DEMO_PLACES.filter(p => p.name.includes(query) || p.address.includes(query)));
       }
+      return;
+    }
+
+    if (isDemoMode) {
+      setPlaces(DEMO_PLACES.filter(p => p.name.includes(query) || p.address.includes(query)));
       return;
     }
     
@@ -143,7 +221,7 @@ export default function Home() {
   useEffect(() => {
     if (window.kakao && window.kakao.maps && window.kakao.maps.LatLng) {
       const visible = places.filter((p) => {
-        const matchesCategory = selectedCategoryId === "all" || (p.categories && p.categories.includes(selectedCategoryId));
+        const matchesCategory = selectedCategoryIds.includes("all") || (p.categories && selectedCategoryIds.some(id => p.categories.includes(id)));
         if (!matchesCategory) return false;
 
         if (!mapBounds) return true;
@@ -159,7 +237,7 @@ export default function Home() {
     } else {
       setVisiblePlaces(places);
     }
-  }, [places, mapBounds, selectedCategoryId]);
+  }, [places, mapBounds, selectedCategoryIds]);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -263,6 +341,21 @@ export default function Home() {
 
   const handleAnalyze = async () => {
     if (!urlInput.trim()) return;
+
+    // 1. 중복 마커 방지 처리
+    const existingPlace = places.find(p => p.url === urlInput.trim());
+    if (existingPlace) {
+      showToast("이미 저장된 장소입니다!");
+      setSelectedPlace(existingPlace);
+      if (existingPlace.lat && existingPlace.lng) {
+        setMapCenter({ lat: existingPlace.lat, lng: existingPlace.lng });
+        if (mapInstance) mapInstance.setLevel(3);
+      }
+      setIsModalOpen(false);
+      setUrlInput("");
+      return;
+    }
+
     setIsLoading(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analyze`, {
@@ -293,13 +386,13 @@ export default function Home() {
     }
   };
 
-  const handleSave = async (place: Place) => {
+  const handleSave = async (place: Place, memo?: string, folder?: string) => {
     if (!session) {
       showToast("로그인이 필요합니다.");
       signIn("google");
       return;
     }
-    
+
     const token = (session as any)?.accessToken;
     if (!token) {
       showToast("로그인 정보가 만료되었습니다. 다시 로그인해주세요.");
@@ -310,7 +403,7 @@ export default function Home() {
     try {
       let lat = place.lat;
       let lng = place.lng;
-      
+
       if (!lat || !lng) {
         const geocoder = new window.kakao.maps.services.Geocoder();
         const searchResult = await new Promise<any>((resolve) => {
@@ -322,9 +415,13 @@ export default function Home() {
         if (searchResult) {
           lat = parseFloat(searchResult.y);
           lng = parseFloat(searchResult.x);
+        } else {
+          showToast("📍 지도에서 위치를 찾을 수 없어요. 주소가 정확한지 확인해주세요!");
+          return;
         }
       }
 
+      const placeToSave = { ...place, url: urlInput, lat, lng, user_email: session?.user?.email, memo, folder: folder || '기본 폴더' };
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/save-place`, {
         method: "POST",
         headers: { 
@@ -332,22 +429,21 @@ export default function Home() {
           "Authorization": `Bearer ${token}`
         },
         credentials: "include",
-        body: JSON.stringify({ ...place, url: urlInput, lat, lng, user_email: session?.user?.email }),
+        body: JSON.stringify(placeToSave),
       });
-      
+
       if (res.status === 401) {
         showToast("인증이 만료되었습니다. 다시 로그인해주세요.");
         setTimeout(() => signOut(), 1500);
         return;
       }
-      
+
       const data = await res.json();
       if (data.status === "success") {
         showToast(`'${place.name}' 장소가 저장되었습니다!`);
         // If in demo mode, switch back to real mode to see the saved place
         if (isDemoMode) setIsDemoMode(false);
-        setPlaces(prev => [{ ...place, id: Date.now().toString(), lat, lng, url: urlInput }, ...prev]);
-        setHasFirstPlace(true);
+        setPlaces(prev => [{ ...placeToSave, id: Date.now().toString() }, ...prev]);        setHasFirstPlace(true);
         setIsModalOpen(false);
         setUrlInput("");
         setAnalyzedPlaces([]);
@@ -363,8 +459,19 @@ export default function Home() {
 
   return (
     <div className="relative w-full h-full flex justify-center bg-gray-100 sm:items-center sm:py-10">
-      {/* Toast Notification */}
+      {/* Toast & Offline Notification */}
       <AnimatePresence>
+        {!isOnline && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
+            exit={{ opacity: 0, y: -20, x: "-50%" }}
+            className="fixed top-6 left-1/2 z-[200] bg-red-500 text-white px-6 py-3 rounded-full shadow-2xl text-sm font-bold flex items-center gap-2 tracking-tight whitespace-nowrap"
+          >
+            <WifiOff size={16} />
+            네트워크 연결을 확인해주세요
+          </motion.div>
+        )}
         {toastMessage && (
           <motion.div
             initial={{ opacity: 0, y: -20, x: "-50%" }}
@@ -374,6 +481,40 @@ export default function Home() {
           >
             <Sparkles size={16} className="text-primary" />
             {toastMessage}
+          </motion.div>
+        )}
+        {deferredPrompt && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-[380px] z-[150] bg-white rounded-2xl shadow-2xl border-2 border-primary/20 p-4 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary shrink-0">
+                <Sparkles size={20} />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-black text-gray-800">Sple 앱 설치하기</span>
+                <span className="text-[10px] font-bold text-gray-500">홈 화면에 추가하고 더 빠르게</span>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult: any) => {
+                  if (choiceResult.outcome === 'accepted') {
+                    setDeferredPrompt(null);
+                  }
+                });
+              }}
+              className="bg-primary text-white px-4 py-2 rounded-full text-xs font-black shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+            >
+              설치
+            </button>
+            <button onClick={() => setDeferredPrompt(null)} className="absolute -top-2 -right-2 w-6 h-6 bg-white rounded-full shadow-md flex items-center justify-center text-gray-400 border border-gray-100">
+              <X size={12} />
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -391,7 +532,25 @@ export default function Home() {
                 className="w-full bg-white/50 py-2.5 pl-10 pr-4 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-primary/10 focus:bg-white transition-all border border-gray-100 focus:border-primary/30 shadow-inner"
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSearchSubmit(searchQuery);
+                }}
               />
+              {/* Search History Chips */}
+              {searchHistory.length > 0 && (
+                <div className="absolute top-[110%] left-0 w-full flex flex-wrap gap-2 p-3 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 opacity-0 invisible group-focus-within:opacity-100 group-focus-within:visible transition-all z-50">
+                  <div className="w-full text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">최근 검색</div>
+                  {searchHistory.map((history, idx) => (
+                    <button
+                      key={idx}
+                      onMouseDown={(e) => { e.preventDefault(); handleSearchSubmit(history); }}
+                      className="px-3 py-1.5 bg-gray-50 hover:bg-primary/10 hover:text-primary text-gray-600 rounded-full text-xs font-bold transition-colors shadow-sm"
+                    >
+                      {history}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             {status === "loading" ? (
               <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse shrink-0"></div>
@@ -409,14 +568,25 @@ export default function Home() {
             <div className="flex overflow-x-auto px-6 pb-4 no-scrollbar gap-2.5 scroll-smooth">
               {CATEGORIES.map((cat) => {
                 const Icon = cat.icon;
-                const isActive = selectedCategoryId === cat.id;
+                const isActive = selectedCategoryIds.includes(cat.id);
                 const isDisabled = isDataEmpty;
                 
                 return (
                   <button
                     key={cat.id}
                     disabled={isDisabled}
-                    onClick={() => setSelectedCategoryId(cat.id)}
+                    onClick={() => {
+                      if (cat.id === "all") {
+                        setSelectedCategoryIds(["all"]);
+                      } else {
+                        setSelectedCategoryIds(prev => {
+                          const newIds = prev.includes(cat.id) 
+                            ? prev.filter(id => id !== cat.id)
+                            : [...prev.filter(id => id !== "all"), cat.id];
+                          return newIds.length === 0 ? ["all"] : newIds;
+                        });
+                      }
+                    }}
                     className={`flex items-center gap-1.5 px-5 py-2.5 rounded-full text-xs font-black whitespace-nowrap transition-all border-2 ${
                       isDisabled 
                         ? "opacity-30 pointer-events-none bg-white/80 text-text-body border-transparent"
@@ -539,8 +709,9 @@ export default function Home() {
         {/* Bottom Sheet */}
         <motion.div 
           className="absolute bottom-0 w-full bg-white rounded-t-[48px] shadow-[0_-20px_60px_rgba(0,0,0,0.15)] z-50 flex flex-col border-t border-gray-50"
-          animate={{ height: isBottomSheetMinimized ? '80px' : (selectedPlace ? '75%' : (isDataEmpty ? '280px' : '220px')) }}
+          animate={{ height: isBottomSheetMinimized ? '80px' : (isListView && !selectedPlace ? '85%' : (selectedPlace ? '75%' : (isDataEmpty ? '280px' : '220px'))) }}
           transition={{ type: "spring", damping: 30, stiffness: 150 }}
+          onPointerDown={(e) => e.stopPropagation()}
         >
           <div 
             className="w-full flex justify-center py-6 cursor-pointer absolute top-0 z-10 group" 
@@ -552,16 +723,26 @@ export default function Home() {
             </div>
           </div>
           
-          <div className={`px-8 pb-10 overflow-y-auto flex-1 custom-scrollbar pt-12 ${isBottomSheetMinimized ? 'opacity-0 pointer-events-none' : 'opacity-100'} transition-opacity duration-300`}>
+          <div className={`px-8 pb-[calc(2.5rem+env(safe-area-inset-bottom))] overflow-y-auto flex-1 custom-scrollbar pt-12 ${isBottomSheetMinimized ? 'opacity-0 pointer-events-none' : 'opacity-100'} transition-opacity duration-300`}>
             {selectedPlace ? (
               <div className="animate-in fade-in slide-in-from-bottom-6 duration-500">
                 <button 
                   onClick={() => setSelectedPlace(null)} 
-                  className="flex items-center gap-2 text-text-body mb-8 hover:text-primary transition-colors group px-1"
+                  className="flex items-center gap-2 text-text-body mb-6 hover:text-primary transition-colors group px-1"
                 >
                   <ArrowLeft size={18} className="group-hover:-translate-x-1.5 transition-transform" />
                   <span className="text-xs font-black uppercase tracking-[0.25em]">탐색기로 돌아가기</span>
                 </button>
+                {selectedPlace.image_url && (
+                  <div className="w-full h-48 rounded-[32px] overflow-hidden mb-6 shadow-md border border-gray-100">
+                    <img src={selectedPlace.image_url} alt={selectedPlace.name} className="w-full h-full object-cover" />
+                  </div>
+                )}
+                {selectedPlace.folder && (
+                  <div className="inline-block bg-primary/10 text-primary px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest mb-3">
+                    📁 {selectedPlace.folder}
+                  </div>
+                )}
                 <h2 className="text-5xl font-black mb-4 text-text-headline tracking-tighter leading-[0.9]">{selectedPlace.name}</h2>
                 <p className="text-sm text-text-body mb-8 font-bold flex items-center gap-1.5 px-1 leading-snug">
                   <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center text-primary shrink-0">
@@ -570,9 +751,16 @@ export default function Home() {
                   {selectedPlace.address}
                 </p>
                 
-                <div className="bg-[#F8F9FF] p-7 rounded-[40px] mb-8 border border-indigo-50/50">
-                  <p className="text-lg font-bold leading-relaxed text-indigo-900/80 italic">"{selectedPlace.description}"</p>
+                <div className="bg-[#F8F9FF] p-7 rounded-[40px] mb-6 border border-indigo-50/50">
+                  <p className="text-lg font-bold leading-relaxed text-indigo-900/80 italic">&quot;{selectedPlace.description}&quot;</p>
                 </div>
+
+                {selectedPlace.memo && (
+                  <div className="bg-amber-50 p-6 rounded-[32px] mb-8 border border-amber-100/50 flex flex-col gap-2">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-amber-500">✍️ 나의 메모</div>
+                    <p className="text-sm font-bold text-amber-900/80 whitespace-pre-wrap">{selectedPlace.memo}</p>
+                  </div>
+                )}
 
                 {selectedPlace.detailed_highlights && (
                   <div className="mb-10">
@@ -593,48 +781,79 @@ export default function Home() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4 mb-8">
+                <div className="grid grid-cols-3 gap-3 mb-8">
                   <a 
                     href={`https://m.map.naver.com/search2/search.naver?query=${encodeURIComponent(selectedPlace.name + ' ' + selectedPlace.address.split(' ').slice(0, 3).join(' '))}`}
                     target="_blank" 
                     rel="noreferrer" 
-                    className="flex flex-col items-center justify-center gap-3 py-6 bg-[#03C75A]/5 text-[#03C75A] rounded-[32px] border border-[#03C75A]/10 hover:bg-[#03C75A] hover:text-white transition-all group active:scale-95 shadow-sm"
+                    className="flex flex-col items-center justify-center gap-3 py-6 bg-[#03C75A]/5 text-[#03C75A] rounded-[28px] border border-[#03C75A]/10 hover:bg-[#03C75A] hover:text-white transition-all group active:scale-95 shadow-sm"
                   >
                     <div className="w-10 h-10 bg-[#03C75A] text-white rounded-2xl flex items-center justify-center font-black text-sm shadow-md group-hover:bg-white group-hover:text-[#03C75A]">N</div>
-                    <span className="text-[11px] font-black uppercase tracking-widest">네이버 지도</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest">네이버 지도</span>
                   </a>
                   <a 
                     href={`https://map.kakao.com/link/search/${encodeURIComponent(selectedPlace.name)}`}
                     target="_blank" 
                     rel="noreferrer" 
-                    className="flex flex-col items-center justify-center gap-3 py-6 bg-[#FAE100]/10 text-[#3C1E1E] rounded-[32px] border border-[#FAE100]/20 hover:bg-[#FAE100] transition-all group active:scale-95 shadow-sm"
+                    className="flex flex-col items-center justify-center gap-3 py-6 bg-[#FAE100]/10 text-[#3C1E1E] rounded-[28px] border border-[#FAE100]/20 hover:bg-[#FAE100] transition-all group active:scale-95 shadow-sm"
                   >
-                    <div className="w-8 h-8 bg-[#FAE100] text-[#3C1E1E] rounded-2xl flex items-center justify-center shadow-md group-hover:bg-white">
+                    <div className="w-10 h-10 bg-[#FAE100] text-[#3C1E1E] rounded-2xl flex items-center justify-center shadow-md group-hover:bg-white">
                       <MapIcon size={20} fill="currentColor" />
                     </div>
-                    <span className="text-[11px] font-black uppercase tracking-widest">카카오맵</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest">카카오맵</span>
+                  </a>
+                  <a 
+                    href={`tmap://route?goalname=${encodeURIComponent(selectedPlace.name)}&goalx=${selectedPlace.lng}&goaly=${selectedPlace.lat}`}
+                    onClick={(e) => {
+                      // Fallback logic for Tmap
+                      setTimeout(() => {
+                        window.location.href = "https://tmap.co.kr";
+                      }, 1500);
+                    }}
+                    className="flex flex-col items-center justify-center gap-3 py-6 bg-[#000000]/5 text-[#000000] rounded-[28px] border border-[#000000]/10 hover:bg-[#000000] hover:text-white transition-all group active:scale-95 shadow-sm"
+                  >
+                    <div className="w-10 h-10 bg-[#000000] text-white rounded-2xl flex items-center justify-center font-black text-sm shadow-md group-hover:bg-white group-hover:text-[#000000]">T</div>
+                    <span className="text-[10px] font-black uppercase tracking-widest">티맵</span>
                   </a>
                 </div>
 
-                <div className="flex flex-col gap-4 pb-6">
+                <div className="flex flex-col gap-3 pb-6">
                   <a 
                     href={selectedPlace.url} 
                     target="_blank" 
                     rel="noreferrer" 
-                    className="w-full bg-[#1E1E1E] text-white py-5 rounded-[32px] flex items-center justify-center gap-3 font-black shadow-xl hover:bg-black active:scale-95 transition-all text-lg"
+                    className="w-full bg-[#1E1E1E] text-white py-4 rounded-[28px] flex items-center justify-center gap-3 font-black shadow-lg hover:bg-black active:scale-95 transition-all text-base"
                   >
-                    <Bookmark size={22} fill="currentColor" />
+                    <Bookmark size={20} fill="currentColor" />
                     인스타그램 원본 확인
                   </a>
                   <a 
                     href={`https://map.kakao.com/link/to/${selectedPlace.name},${selectedPlace.lat},${selectedPlace.lng}`}
                     target="_blank" 
                     rel="noreferrer" 
-                    className="w-full bg-gradient-to-r from-primary to-[#FF8589] text-white py-5 rounded-[32px] flex items-center justify-center gap-3 font-black shadow-xl shadow-primary/30 active:scale-95 transition-all text-lg"
+                    className="w-full bg-gradient-to-r from-primary to-[#FF8589] text-white py-4 rounded-[28px] flex items-center justify-center gap-3 font-black shadow-lg shadow-primary/30 active:scale-95 transition-all text-base"
                   >
-                    <Navigation size={22} fill="currentColor" />
+                    <Navigation size={20} fill="currentColor" />
                     지금 길찾기 시작
                   </a>
+                  <button 
+                    onClick={() => {
+                      if (navigator.share) {
+                        navigator.share({
+                          title: `Sple 핫플: ${selectedPlace.name}`,
+                          text: `${selectedPlace.name} - ${selectedPlace.description}`,
+                          url: window.location.href + `?url=${encodeURIComponent(selectedPlace.url)}`
+                        });
+                      } else {
+                        navigator.clipboard.writeText(window.location.href + `?url=${encodeURIComponent(selectedPlace.url)}`);
+                        showToast("링크가 복사되었습니다!");
+                      }
+                    }}
+                    className="w-full bg-white text-gray-700 py-4 rounded-[28px] flex items-center justify-center gap-3 font-black shadow-sm border border-gray-200 active:scale-95 transition-all text-base"
+                  >
+                    <LinkIcon size={20} strokeWidth={2.5} />
+                    친구에게 장소 공유하기
+                  </button>
                 </div>
               </div>
             ) : (
@@ -652,8 +871,34 @@ export default function Home() {
                       <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-secondary" />
                     </motion.div>
 
-                    <div className="w-14 h-14 bg-[#F2F2F2] rounded-3xl flex items-center justify-center text-text-headline mb-4 shadow-sm relative overflow-hidden">
-                      <LinkIcon size={28} className="absolute rotate-45 text-primary" />
+                    <div className="w-32 h-32 mb-4 relative flex items-center justify-center">
+                      <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="absolute">
+                        <circle cx="50" cy="50" r="45" fill="#F7F8FA" />
+                        <path d="M25 45C25 31.1929 36.1929 20 50 20C63.8071 20 75 31.1929 75 45C75 62.5 50 85 50 85C50 85 25 62.5 25 45Z" fill="url(#paint0_linear)" fillOpacity="0.1" />
+                        <path d="M50 80C50 80 28 58.75 28 43C28 30.8497 37.8497 21 50 21C62.1503 21 72 30.8497 72 43C72 58.75 50 80 50 80Z" fill="url(#paint1_linear)" />
+                        <circle cx="50" cy="40" r="10" fill="white" />
+                        <path d="M70 75L80 85" stroke="#00D09E" strokeWidth="4" strokeLinecap="round" />
+                        <path d="M20 30L15 25" stroke="#6B4EFF" strokeWidth="4" strokeLinecap="round" />
+                        <circle cx="85" cy="35" r="3" fill="#FF5A5F" />
+                        <circle cx="20" cy="65" r="4" fill="#00D09E" />
+                        <defs>
+                          <linearGradient id="paint0_linear" x1="50" y1="20" x2="50" y2="85" gradientUnits="userSpaceOnUse">
+                            <stop stopColor="#FF5A5F" />
+                            <stop offset="1" stopColor="#FF5A5F" stopOpacity="0" />
+                          </linearGradient>
+                          <linearGradient id="paint1_linear" x1="28" y1="21" x2="72" y2="80" gradientUnits="userSpaceOnUse">
+                            <stop stopColor="#FF5A5F" />
+                            <stop offset="1" stopColor="#FF8589" />
+                          </linearGradient>
+                        </defs>
+                      </svg>
+                      <motion.div 
+                        animate={{ y: [0, -5, 0] }} 
+                        transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+                        className="relative z-10 text-white"
+                      >
+                        <MapPin size={24} fill="currentColor" strokeWidth={1} className="text-white mt-[-10px]" />
+                      </motion.div>
                     </div>
                     <h3 className="font-black text-[22px] tracking-tighter mb-2 text-center text-text-headline leading-tight">
                       인스타 핫플을<br/>가장 쉽게 저장하세요
@@ -695,8 +940,17 @@ export default function Home() {
                         </h2>
                         {isDemoMode && <span className="bg-[#6B4EFF]/10 text-[#6B4EFF] px-2 py-1 rounded-md text-[10px] font-black uppercase">Demo</span>}
                       </div>
-                      <div className="bg-gray-100 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-text-body shadow-inner">
-                        {visiblePlaces.length} 개
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => setIsListView(!isListView)}
+                          className="bg-white border border-gray-100 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-text-body shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+                        >
+                          {isListView ? <MapIcon size={12} /> : <div className="w-3 h-3 flex flex-col gap-0.5"><div className="w-full h-0.5 bg-current rounded-full"/><div className="w-full h-0.5 bg-current rounded-full"/><div className="w-full h-0.5 bg-current rounded-full"/></div>}
+                          {isListView ? '지도 보기' : '목록 보기'}
+                        </button>
+                        <div className="bg-gray-100 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-text-body shadow-inner">
+                          {visiblePlaces.length} 개
+                        </div>
                       </div>
                     </div>
                     {isDemoMode && (
@@ -768,7 +1022,7 @@ export default function Home() {
                 animate={{ y: 0, scale: 1 }}
                 exit={{ y: "100%", scale: 0.95 }}
                 transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                className="w-full sm:max-w-md bg-white rounded-t-[56px] sm:rounded-[56px] p-10 shadow-2xl flex flex-col max-h-[90vh] border-t border-gray-100"
+                className="w-full sm:max-w-md bg-white rounded-t-[56px] sm:rounded-[56px] px-10 pt-10 pb-[calc(2.5rem+env(safe-area-inset-bottom))] shadow-2xl flex flex-col max-h-[90vh] border-t border-gray-100"
               >
                 <div className="flex justify-between items-center mb-8">
                   <div className="flex flex-col">
@@ -804,13 +1058,29 @@ export default function Home() {
                   <>
                     <div className="relative mb-6 group">
                       <label className="block text-xs font-black text-text-body mb-2 uppercase tracking-widest pl-2">인스타그램 링크</label>
-                      <input 
-                        type="text"
-                        placeholder="https://www.instagram.com/p/..."
-                        className="w-full bg-gray-50/80 px-6 py-5 rounded-[24px] outline-none ring-4 ring-transparent focus:ring-primary/10 focus:bg-white transition-all text-sm font-bold text-gray-700 border-2 border-gray-100 focus:border-primary/30"
-                        value={urlInput}
-                        onChange={(e) => setUrlInput(e.target.value)}
-                      />
+                      <div className="relative flex items-center">
+                        <input 
+                          type="text"
+                          placeholder="https://www.instagram.com/p/..."
+                          className="w-full bg-gray-50/80 px-6 py-5 pr-14 rounded-[24px] outline-none ring-4 ring-transparent focus:ring-primary/10 focus:bg-white transition-all text-sm font-bold text-gray-700 border-2 border-gray-100 focus:border-primary/30"
+                          value={urlInput}
+                          onChange={(e) => setUrlInput(e.target.value)}
+                        />
+                        <button
+                          onClick={async () => {
+                            try {
+                              const text = await navigator.clipboard.readText();
+                              setUrlInput(text);
+                            } catch (err) {
+                              showToast("클립보드 접근 권한이 거부되었습니다. 링크를 직접 붙여넣어주세요.");
+                            }
+                          }}
+                          className="absolute right-4 text-gray-400 hover:text-primary transition-colors"
+                          title="붙여넣기"
+                        >
+                          <ClipboardPaste size={20} />
+                        </button>
+                      </div>
                     </div>
                     <button 
                       id="analyze-btn"
@@ -841,10 +1111,25 @@ export default function Home() {
                             <span>{place.address}</span>
                           </p>
                           <div className="bg-gray-50 p-4 rounded-2xl mb-6 border border-gray-100/50">
-                            <p className="text-sm text-gray-600 italic leading-relaxed line-clamp-2">"{place.description}"</p>
+                            <p className="text-sm text-gray-600 italic leading-relaxed line-clamp-2">&quot;{place.description}&quot;</p>
+                          </div>
+                          <div className="flex flex-col gap-3 mb-6">
+                            <input 
+                              type="text" 
+                              placeholder="폴더 지정 (예: 데이트 코스)" 
+                              className="w-full bg-gray-50 px-4 py-3 rounded-xl text-xs font-bold outline-none border border-gray-200 focus:border-primary/50 transition-colors"
+                              value={folderInputs[idx] || ""}
+                              onChange={(e) => setFolderInputs(prev => ({...prev, [idx]: e.target.value}))}
+                            />
+                            <textarea 
+                              placeholder="개인 메모 (예: 웨이팅 김)" 
+                              className="w-full bg-gray-50 px-4 py-3 rounded-xl text-xs font-bold outline-none border border-gray-200 focus:border-primary/50 transition-colors resize-none h-20"
+                              value={memoInputs[idx] || ""}
+                              onChange={(e) => setMemoInputs(prev => ({...prev, [idx]: e.target.value}))}
+                            />
                           </div>
                           <button 
-                            onClick={() => handleSave(place)}
+                            onClick={() => handleSave(place, memoInputs[idx], folderInputs[idx])}
                             className="w-full bg-primary text-white rounded-[24px] text-base font-black shadow-xl shadow-primary/20 hover:brightness-110 active:scale-95 transition-all uppercase tracking-widest py-4"
                           >
                             내 지도에 추가하기

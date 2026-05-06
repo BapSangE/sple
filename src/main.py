@@ -105,6 +105,8 @@ class PlaceSaveRequest(BaseModel):
     categories: list = []
     detailed_highlights: str = ""
     user_email: str = None
+    memo: str = None
+    folder: str = "기본 폴더"
 
 # --- Utility Functions ---
 
@@ -275,7 +277,9 @@ async def save_place_api(request: PlaceSaveRequest, user: dict = Depends(get_cur
             categories=json.dumps(request.categories),
             detailed_highlights=request.detailed_highlights,
             user_email=user.get("email"),
-            user_id=int(user.get("sub")) if user.get("sub") else None
+            user_id=int(user.get("sub")) if user.get("sub") else None,
+            memo=request.memo,
+            folder=request.folder
         )
         db.add(new_place)
         await db.commit()

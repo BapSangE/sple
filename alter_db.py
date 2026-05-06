@@ -3,24 +3,20 @@ from src.database import engine
 from sqlalchemy import text
 
 async def run():
-    async with engine.begin() as conn:
+    queries = [
+        ('ALTER TABLE users ADD COLUMN google_id VARCHAR UNIQUE;', 'google_id to users'),
+        ('ALTER TABLE users ADD COLUMN last_login TIMESTAMP;', 'last_login to users'),
+        ('ALTER TABLE places ADD COLUMN user_id INTEGER REFERENCES users(id);', 'user_id to places'),
+        ('ALTER TABLE places ADD COLUMN memo TEXT;', 'memo to places'),
+        ('ALTER TABLE places ADD COLUMN folder VARCHAR;', 'folder to places'),
+    ]
+    for query, desc in queries:
         try:
-            await conn.execute(text('ALTER TABLE users ADD COLUMN google_id VARCHAR UNIQUE;'))
-            print("Added google_id to users.")
+            async with engine.begin() as conn:
+                await conn.execute(text(query))
+            print(f"Added {desc}.")
         except Exception as e:
-            print("Could not add google_id:", e)
-        
-        try:
-            await conn.execute(text('ALTER TABLE users ADD COLUMN last_login TIMESTAMP;'))
-            print("Added last_login to users.")
-        except Exception as e:
-            print("Could not add last_login:", e)
-            
-        try:
-            await conn.execute(text('ALTER TABLE places ADD COLUMN user_id INTEGER REFERENCES users(id);'))
-            print("Added user_id to places.")
-        except Exception as e:
-            print("Could not add user_id to places:", e)
+            print(f"Could not add {desc}: {e}")
             
 if __name__ == "__main__":
     asyncio.run(run())

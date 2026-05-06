@@ -49,6 +49,14 @@ h1, h2, h3, h4, h5, h6 {
   scrollbar-width: none;
 }
 
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
 /* Glassmorphism utility */
 @utility glass {
   background: rgba(255, 255, 255, 0.7);

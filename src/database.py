@@ -57,6 +57,8 @@ class Place(Base):
     detailed_highlights: Mapped[Optional[str]] = mapped_column(Text)
     user_email: Mapped[Optional[str]] = mapped_column(String)
     user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"))
+    memo: Mapped[Optional[str]] = mapped_column(Text)
+    folder: Mapped[Optional[str]] = mapped_column(String)
     created_at: Mapped[Optional[str]] = mapped_column(DateTime, server_default=func.now())
 
 async def init_db():
