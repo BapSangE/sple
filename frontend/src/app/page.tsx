@@ -82,7 +82,7 @@ export default function Home() {
 
   useKakaoLoader({
     appkey: process.env.NEXT_PUBLIC_KAKAO_API_KEY || "",
-    libraries: ["services"],
+    libraries: ["services", "clusterer"],
   });
 
   const [places, setPlaces] = useState<Place[]>([]);
