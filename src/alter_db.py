@@ -1,5 +1,5 @@
 import asyncio
-from src.database import engine
+from database import engine
 from sqlalchemy import text
 
 async def run():
