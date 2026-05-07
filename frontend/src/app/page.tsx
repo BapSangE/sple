@@ -213,20 +213,29 @@ export default function Home() {
     const fetchPlaces = async () => {
       if (!session) { setPlaces([]); return; }
       const token = (session as any)?.accessToken;
-      if (!token) { signOut(); return; }
+      if (!token) { 
+        console.error("Session exists but no accessToken found");
+        return; 
+      }
 
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/places`, {
           headers: { "Authorization": `Bearer ${token}` },
           credentials: "include"
         });
-        if (res.status === 401) { signOut(); return; }
+        if (res.status === 401) { 
+          showToast("로그인 세션이 만료되었습니다. 다시 로그인해주세요.", "error");
+          return; 
+        }
         const data = await res.json();
         if (data.status === "success") {
           setPlaces(data.data);
           setHasFirstPlace(data.data.length > 0);
         } else { setPlaces([]); }
-      } catch (err) { setPlaces([]); }
+      } catch (err) { 
+        console.error("Failed to fetch places:", err);
+        setPlaces([]); 
+      }
     };
     fetchPlaces();
   }, [session, status, isDemoMode]);

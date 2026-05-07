@@ -36,6 +36,25 @@ IG_PAGE_ACCESS_TOKEN = os.getenv("IG_PAGE_ACCESS_TOKEN")
 # 배포 도메인으로 업데이트
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://sple-insta.com")
 
+GCP_SA_KEY_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+GCP_SA_KEY_JSON = os.getenv("GCP_SA_KEY_JSON")
+GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "insta-place-493505")
+GCP_LOCATION = os.getenv("GCP_LOCATION", "us-central1")
+
+# GCP 인증 파일 처리 (JSON 문자열이 있을 경우 임시 파일 생성)
+if not GCP_SA_KEY_PATH and GCP_SA_KEY_JSON:
+    try:
+        import tempfile
+        temp_dir = tempfile.gettempdir()
+        temp_path = os.path.join(temp_dir, "insta-place-gcp.json")
+        with open(temp_path, "w", encoding="utf-8") as f:
+            f.write(GCP_SA_KEY_JSON)
+        GCP_SA_KEY_PATH = temp_path
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = temp_path
+        logger.info(f"Created temporary GCP key file at {temp_path}")
+    except Exception as e:
+        logger.error(f"Failed to create temporary GCP key file: {e}")
+
 JWT_SECRET = os.getenv("NEXTAUTH_SECRET", os.getenv("JWT_SECRET", "super-secret-key-change-me-later"))
 ALGORITHM = "HS256"
 
@@ -54,10 +73,18 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
 client = None
-if GEMINI_API_KEY:
+if GCP_SA_KEY_PATH and os.path.exists(GCP_SA_KEY_PATH):
+    logger.info(f"Using GCP Service Account from {GCP_SA_KEY_PATH}")
+    client = genai.Client(
+        vertexai=True,
+        project=GCP_PROJECT_ID,
+        location=GCP_LOCATION
+    )
+elif GEMINI_API_KEY:
+    logger.info("Using Gemini API Key")
     client = genai.Client(api_key=GEMINI_API_KEY)
 else:
-    logger.warning("GEMINI_API_KEY가 설정되지 않았습니다.")
+    logger.warning("Gemini 인증 정보(API_KEY 또는 GCP JSON)가 설정되지 않았습니다.")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
