@@ -1,38 +1,18 @@
 @import "tailwindcss";
 
-@theme inline {
+@theme {
   /* Cinematic Dark Palette from design guide */
-  --color-primary: #ffb3b0;
-  --color-on-primary: #68000f;
-  --color-primary-container: #ff6b6b;
-  --color-on-primary-container: #6d0010;
-  
-  --color-secondary: #b9c8de;
-  --color-on-secondary: #233143;
-  --color-secondary-container: #39485a;
-  --color-on-secondary-container: #a7b6cc;
-
-  --color-tertiary: #52dea2;
-  --color-on-tertiary: #003824;
-  --color-tertiary-container: #00b179;
-  --color-on-tertiary-container: #003b26;
-
-  --color-surface: #1c1010;
-  --color-on-surface: #f5dddb;
-  --color-on-surface-variant: #e0bfbd;
-  --color-surface-container: #291c1c;
-  --color-surface-container-high: #352726;
-  --color-surface-container-highest: #403130;
-  
-  --color-outline: #a78a88;
-  --color-outline-variant: #584140;
-
-  --color-background: #1c1010;
-  --color-map-bg: #000000;
+  --color-sple-red: #FF6B6B;
   --color-map-surface: #0F172A;
   --color-map-border: #1E293B;
-  --color-sple-red: #FF6B6B;
+  --color-map-bg: #000000;
+  
+  --color-primary: #FF6B6B;
+  --color-secondary: #6B4EFF;
+  --color-tertiary: #00D09E;
 
+  --color-slate-94A3B8: #94A3B8;
+  
   /* Fonts */
   --font-display: var(--font-epilogue);
   --font-body: var(--font-be-vietnam-pro);
