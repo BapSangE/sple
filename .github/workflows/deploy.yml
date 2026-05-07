@@ -47,10 +47,9 @@ jobs:
           image: ${{ steps.login-ecr.outputs.registry }}/sple-backend:latest
           environment-variables: |
             DATABASE_URL=${{ secrets.DATABASE_URL }}
-            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+            GCP_SA_KEY_JSON=${{ secrets.GCP_SA_KEY_JSON }}
             GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
             GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
-            GCP_SA_KEY_JSON=${{ secrets.GCP_SA_KEY_JSON }}
 
       # 3. 여기도 v1 -> v2 로 올려줍니다.
       - name: Deploy to Amazon ECS
