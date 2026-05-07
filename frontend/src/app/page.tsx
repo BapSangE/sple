@@ -358,7 +358,7 @@ export default function Home() {
   const isDataEmpty = !hasFirstPlace && !isDemoMode;
 
   return (
-    <div className="relative w-full h-screen bg-black text-[#94A3B8] overflow-hidden selection:bg-[#FF6B6B]/30 font-body-md">
+    <div className="relative w-full h-screen bg-black text-[#94A3B8] overflow-hidden selection:bg-[sple-red]/30 font-body-md">
       {/* Map Background Area */}
       <main className="absolute inset-0 w-full h-full z-0">
         <Map
@@ -381,7 +381,7 @@ export default function Home() {
                     className="cursor-pointer"
                     onClick={() => setSelectedPlace(p)}
                   >
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all ${isSelected ? 'bg-[#FF6B6B] text-white scale-110' : 'bg-[#0F172A] text-[#FF6B6B] border border-map-border'}`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all ${isSelected ? 'bg-[sple-red] text-white scale-110' : 'bg-[map-surface] text-[sple-red] border border-map-border'}`}>
                       <CatIcon size={20} strokeWidth={2.5} />
                     </div>
                   </div>
@@ -393,16 +393,16 @@ export default function Home() {
       </main>
 
       {/* Top Navigation */}
-      <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 py-3 bg-[#0F172A]/80 backdrop-blur-xl border-b border-map-border/50 shadow-sm">
+      <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 py-3 bg-[map-surface]/80 backdrop-blur-xl border-b border-map-border/50 shadow-sm">
         <div className="flex items-center">
-          <div className="text-[#FF6B6B]">
+          <div className="text-[sple-red]">
             <MapPin size={24} fill="currentColor" />
           </div>
           <span className="ml-2 font-display text-2xl font-bold text-white hidden sm:block">Sple</span>
         </div>
 
         <div className="flex-1 max-w-md mx-4">
-          <div className="bg-[#0F172A]/60 backdrop-blur-2xl border border-map-border rounded-full flex items-center px-4 py-2 hover:bg-[#0F172A]/80 transition-all">
+          <div className="bg-[map-surface]/60 backdrop-blur-2xl border border-map-border rounded-full flex items-center px-4 py-2 hover:bg-[map-surface]/80 transition-all">
             <Search className="text-[#94A3B8] mr-2" size={18} />
             <input 
               id="search-input"
@@ -416,7 +416,7 @@ export default function Home() {
           </div>
         </div>
 
-        <button onClick={() => signIn("google")} className="bg-[#FF6B6B] text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg shadow-[#FF6B6B]/20 active:scale-95 transition-all">로그인</button>
+        <button onClick={() => signIn("google")} className="bg-[sple-red] text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg shadow-[sple-red]/20 active:scale-95 transition-all">로그인</button>
       </header>
 
       {/* Category Chips */}
@@ -425,10 +425,10 @@ export default function Home() {
           <button 
             key={cat.id}
             onClick={() => setSelectedCategoryIds([cat.id])}
-            className={`flex-shrink-0 px-5 py-2 rounded-full text-sm font-medium transition-all active:scale-95 ${
+            className={`shrink-0 px-5 py-2 rounded-full text-sm font-medium transition-all active:scale-95 ${
               selectedCategoryIds.includes(cat.id) 
-                ? "bg-[#FF6B6B] text-white shadow-lg shadow-[#FF6B6B]/20" 
-                : "bg-[#0F172A]/60 backdrop-blur-xl border border-map-border text-white hover:bg-[#0F172A]/80"
+                ? "bg-[sple-red] text-white shadow-lg shadow-[sple-red]/20" 
+                : "bg-[map-surface]/60 backdrop-blur-xl border border-map-border text-white hover:bg-[map-surface]/80"
             }`}
           >
             {cat.label}
@@ -437,7 +437,7 @@ export default function Home() {
       </div>
 
       {/* Unified FAB & Mint Tooltip */}
-      <div className="absolute right-4 bottom-[120px] flex flex-col items-end gap-3 z-[100]">
+      <div className="absolute right-4 bottom-[120px] flex flex-col items-end gap-3 z-100">
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: [0, -5, 0] }}
@@ -445,12 +445,12 @@ export default function Home() {
           className="bg-[#00D09E] text-white text-[12px] font-bold px-4 py-2.5 rounded-2xl shadow-xl relative"
         >
           지금 바로 링크를 공유해보세요!
-          <div className="absolute -bottom-2 right-6 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-[#00D09E]" />
+          <div className="absolute -bottom-2 right-6 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-8 border-t-[#00D09E]" />
         </motion.div>
         <button 
           id="add-link-btn"
           onClick={() => setIsModalOpen(true)}
-          className="bg-[#FF6B6B] text-white p-4 rounded-full shadow-[0_8px_32px_rgba(255,107,107,0.4)] hover:brightness-110 active:scale-90 transition-all"
+          className="bg-[sple-red] text-white p-4 rounded-full shadow-[0_8px_32px_rgba(255,107,107,0.4)] hover:brightness-110 active:scale-90 transition-all"
         >
           <Plus size={28} strokeWidth={3} />
         </button>
@@ -458,13 +458,13 @@ export default function Home() {
 
       {/* Map Controls */}
       <div className="absolute top-[160px] right-4 flex flex-col gap-2 z-40">
-        <div className="bg-[#0F172A]/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-map-border flex flex-col overflow-hidden">
+        <div className="bg-[map-surface]/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-map-border flex flex-col overflow-hidden">
           <button onClick={() => mapInstance?.setLevel(mapInstance.getLevel() - 1)} className="p-3 text-white hover:bg-white/10 border-b border-map-border"><Plus size={20} /></button>
           <button onClick={() => mapInstance?.setLevel(mapInstance.getLevel() + 1)} className="p-3 text-white hover:bg-white/10"><Minus size={20} /></button>
         </div>
         <button 
           onClick={() => navigator.geolocation.getCurrentPosition(pos => setMapCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }))}
-          className="bg-[#0F172A]/80 backdrop-blur-xl p-3 rounded-full text-white shadow-2xl border border-map-border hover:bg-white/10"
+          className="bg-[map-surface]/80 backdrop-blur-xl p-3 rounded-full text-white shadow-2xl border border-map-border hover:bg-white/10"
         >
           <LocateFixed size={20} />
         </button>
@@ -472,7 +472,7 @@ export default function Home() {
 
       {/* Bottom Sheet */}
       <motion.div 
-        className="absolute bottom-0 w-full bg-[#0F172A]/95 backdrop-blur-2xl rounded-t-[24px] shadow-[0_-20px_60px_rgba(0,0,0,0.5)] z-[110] flex flex-col border-t border-map-border"
+        className="absolute bottom-0 w-full bg-[map-surface]/95 backdrop-blur-2xl rounded-t-[24px] shadow-[0_-20px_60px_rgba(0,0,0,0.5)] z-110 flex flex-col border-t border-map-border"
         animate={{ height: isBottomSheetMinimized ? '80px' : (selectedPlace ? '75%' : (places.length > 0 ? '50%' : '340px')) }}
         transition={{ type: "spring", damping: 30, stiffness: 150 }}
       >
@@ -488,7 +488,7 @@ export default function Home() {
               </button>
               <h2 className="text-4xl font-bold mb-4 tracking-tight">{selectedPlace.name}</h2>
               <p className="text-sm text-[#94A3B8] mb-8 flex items-center gap-2">
-                <Navigation size={14} className="text-[#FF6B6B]" /> {selectedPlace.address}
+                <Navigation size={14} className="text-[sple-red]" /> {selectedPlace.address}
               </p>
               
               <div className="bg-white/5 p-6 rounded-[24px] mb-8 border-none">
@@ -516,7 +516,7 @@ export default function Home() {
                 <a href={selectedPlace.url} target="_blank" className="bg-white/10 text-white py-4 rounded-2xl flex items-center justify-center gap-2 font-bold hover:bg-white/20 transition-all">
                   <Bookmark size={18} /> 인스타 원본
                 </a>
-                <a href={`https://map.kakao.com/link/to/${selectedPlace.name},${selectedPlace.lat},${selectedPlace.lng}`} target="_blank" className="bg-[#FF6B6B] text-white py-4 rounded-2xl flex items-center justify-center gap-2 font-bold shadow-lg shadow-[#FF6B6B]/20">
+                <a href={`https://map.kakao.com/link/to/${selectedPlace.name},${selectedPlace.lat},${selectedPlace.lng}`} target="_blank" className="bg-[sple-red] text-white py-4 rounded-2xl flex items-center justify-center gap-2 font-bold shadow-lg shadow-[sple-red]/20">
                   <Navigation size={18} /> 길찾기
                 </a>
               </div>
@@ -525,7 +525,7 @@ export default function Home() {
             <div className="space-y-6 pt-4">
               <div className="flex justify-between items-center px-1">
                 <h2 className="text-2xl font-bold text-white tracking-tight">{isDemoMode ? "에디터 픽: 성수" : "내 핫플 목록"}</h2>
-                <span className="bg-[#FF6B6B]/20 text-[#FF6B6B] px-3 py-1 rounded-full text-[10px] font-bold">{places.length}개</span>
+                <span className="bg-[sple-red]/20 text-[sple-red] px-3 py-1 rounded-full text-[10px] font-bold">{places.length}개</span>
               </div>
               <div className="grid gap-4 pb-12">
                 {places.map((p) => (
@@ -536,16 +536,16 @@ export default function Home() {
                       setMapCenter({ lat: p.lat, lng: p.lng });
                       if (mapInstance) mapInstance.setLevel(3);
                     }}
-                    className="flex items-center gap-4 p-5 bg-white/5 rounded-[28px] border border-transparent hover:border-[#FF6B6B]/30 transition-all cursor-pointer group"
+                    className="flex items-center gap-4 p-5 bg-white/5 rounded-[28px] border border-transparent hover:border-[sple-red]/30 transition-all cursor-pointer group"
                   >
-                    <div className="w-12 h-12 bg-black/40 rounded-2xl flex items-center justify-center text-[#FF6B6B] group-hover:bg-[#FF6B6B] group-hover:text-white transition-all">
+                    <div className="w-12 h-12 bg-black/40 rounded-2xl flex items-center justify-center text-[sple-red] group-hover:bg-[sple-red] group-hover:text-white transition-all">
                       <MapPin size={20} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <h4 className="font-bold text-white truncate">{p.name}</h4>
                       <p className="text-xs text-[#94A3B8] truncate mt-1">{p.address}</p>
                     </div>
-                    <ExternalLink size={16} className="text-white/20 group-hover:text-[#FF6B6B] transition-colors" />
+                    <ExternalLink size={16} className="text-white/20 group-hover:text-[sple-red] transition-colors" />
                   </div>
                 ))}
               </div>
@@ -553,16 +553,16 @@ export default function Home() {
           ) : (
             <div className="flex flex-col items-center text-center pt-4">
               <div className="w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-6 shadow-2xl relative">
-                <div className="absolute inset-0 rounded-full bg-[#FF6B6B]/20 blur-xl"></div>
-                <Sparkles size={40} className="text-[#FF6B6B] relative z-10" />
+                <div className="absolute inset-0 rounded-full bg-[sple-red]/20 blur-xl"></div>
+                <Sparkles size={40} className="text-[sple-red] relative z-10" />
               </div>
               <h2 className="text-2xl font-bold text-white mb-3 font-display">인스타 핫플을 가장 쉽게 저장하세요</h2>
               <p className="text-sm text-[#94A3B8] mb-8 leading-relaxed">
                 게시물의 [공유하기] 버튼을 눌러 스플로 보내면<br/>AI가 알아서 찾아드려요!
               </p>
-              <button onClick={handleToggleDemo} className="w-full max-w-sm bg-[#0F172A] border border-[#FF6B6B]/50 text-white py-4 rounded-2xl font-bold hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center gap-2">
+              <button onClick={handleToggleDemo} className="w-full max-w-sm bg-[map-surface] border border-[sple-red]/50 text-white py-4 rounded-2xl font-bold hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center gap-2">
                 <span>성수동 에디터 픽 미리보기</span>
-                <ArrowLeft size={18} className="rotate-180 text-[#FF6B6B]" />
+                <ArrowLeft size={18} className="rotate-180 text-[sple-red]" />
               </button>
             </div>
           )}
@@ -572,10 +572,10 @@ export default function Home() {
       {/* Modal */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="absolute inset-0 z-[200] flex justify-center items-end bg-black/80 backdrop-blur-md sm:items-center p-4">
+          <div className="absolute inset-0 z-200 flex justify-center items-end bg-black/80 backdrop-blur-md sm:items-center p-4">
             <motion.div 
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              className="w-full sm:max-w-md bg-[#0F172A] rounded-[32px] p-8 border border-map-border shadow-2xl"
+              className="w-full sm:max-w-md bg-[map-surface] rounded-[32px] p-8 border border-map-border shadow-2xl"
             >
               <div className="flex justify-between items-center mb-8">
                 <h3 className="text-2xl font-bold text-white tracking-tight font-display italic">AI 자동 분석</h3>
@@ -597,7 +597,7 @@ export default function Home() {
                       <input 
                         id="url-input"
                         name="url"
-                        className="w-full bg-white/5 border border-map-border rounded-2xl px-5 py-4 text-white outline-none focus:border-[#FF6B6B]/50 transition-all"
+                        className="w-full bg-white/5 border border-map-border rounded-2xl px-5 py-4 text-white outline-none focus:border-[sple-red]/50 transition-all"
                         placeholder="https://www.instagram.com/p/..."
                         value={urlInput}
                         onChange={(e) => setUrlInput(e.target.value)}
@@ -611,15 +611,15 @@ export default function Home() {
                       </button>
                     </div>
                   </div>
-                  <button onClick={handleAnalyze} className="w-full bg-gradient-to-r from-[#6B4EFF] to-[#8B74FF] text-white py-5 rounded-2xl font-bold shadow-xl shadow-[#6B4EFF]/20 hover:brightness-110 transition-all">
+                  <button onClick={handleAnalyze} className="w-full bg-linear-to-r from-[#6B4EFF] to-[#8B74FF] text-white py-5 rounded-2xl font-bold shadow-xl shadow-[#6B4EFF]/20 hover:brightness-110 transition-all">
                     AI 분석 시작하기
                   </button>
                 </div>
               ) : (
                 <div className="space-y-4 max-h-[60vh] overflow-y-auto no-scrollbar pt-2">
                   {!session && (
-                    <div className="mb-4 p-4 rounded-2xl bg-[#FF6B6B]/10 border border-[#FF6B6B]/30 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-[#FF6B6B] flex items-center justify-center shrink-0">
+                    <div className="mb-4 p-4 rounded-2xl bg-[sple-red]/10 border border-[sple-red]/30 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-[sple-red] flex items-center justify-center shrink-0">
                         <WifiOff size={16} className="text-white" />
                       </div>
                       <p className="text-xs font-bold text-white leading-tight">
@@ -634,7 +634,7 @@ export default function Home() {
                       onClick={() => setSelectedAnalyzedIndices(
                         selectedAnalyzedIndices.length === analyzedPlaces.length ? [] : analyzedPlaces.map((_, i) => i)
                       )}
-                      className="text-[10px] font-bold text-[#FF6B6B] uppercase tracking-widest"
+                      className="text-[10px] font-bold text-[sple-red] uppercase tracking-widest"
                     >
                       {selectedAnalyzedIndices.length === analyzedPlaces.length ? "전체 해제" : "전체 선택"}
                     </button>
@@ -643,7 +643,7 @@ export default function Home() {
                     <div 
                       key={i} 
                       className={`p-6 rounded-[28px] border transition-all cursor-pointer ${
-                        selectedAnalyzedIndices.includes(i) ? "bg-[#FF6B6B]/10 border-[#FF6B6B]/30" : "bg-white/5 border-white/5"
+                        selectedAnalyzedIndices.includes(i) ? "bg-[sple-red]/10 border-[sple-red]/30" : "bg-white/5 border-white/5"
                       }`}
                       onClick={() => setSelectedAnalyzedIndices(prev => 
                         prev.includes(i) ? prev.filter(idx => idx !== i) : [...prev, i]
@@ -651,7 +651,7 @@ export default function Home() {
                     >
                       <div className="flex items-start gap-3">
                         <div className={`mt-1 w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all ${
-                          selectedAnalyzedIndices.includes(i) ? "bg-[#FF6B6B] border-[#FF6B6B]" : "border-map-border"
+                          selectedAnalyzedIndices.includes(i) ? "bg-[sple-red] border-[sple-red]" : "border-map-border"
                         }`}>
                           {selectedAnalyzedIndices.includes(i) && <Check size={14} className="text-white" strokeWidth={4} />}
                         </div>
@@ -671,7 +671,7 @@ export default function Home() {
                                 id={`folder-input-${i}`}
                                 name={`folder-${i}`}
                                 placeholder="폴더 지정 (예: 데이트 코스)" 
-                                className="w-full bg-black/30 px-4 py-3 rounded-xl text-xs font-bold outline-none border border-white/10 focus:border-[#FF6B6B]/50 transition-colors text-white"
+                                className="w-full bg-black/30 px-4 py-3 rounded-xl text-xs font-bold outline-none border border-white/10 focus:border-[sple-red]/50 transition-colors text-white"
                                 value={folderInputs[i] || ""}
                                 onChange={(e) => setFolderInputs(prev => ({...prev, [i]: e.target.value}))}
                               />
@@ -679,7 +679,7 @@ export default function Home() {
                                 id={`memo-input-${i}`}
                                 name={`memo-${i}`}
                                 placeholder="개인 메모 (예: 웨이팅 김)" 
-                                className="w-full bg-black/30 px-4 py-3 rounded-xl text-xs font-bold outline-none border border-white/10 focus:border-[#FF6B6B]/50 transition-colors resize-none h-20 text-white"
+                                className="w-full bg-black/30 px-4 py-3 rounded-xl text-xs font-bold outline-none border border-white/10 focus:border-[sple-red]/50 transition-colors resize-none h-20 text-white"
                                 value={memoInputs[i] || ""}
                                 onChange={(e) => setMemoInputs(prev => ({...prev, [i]: e.target.value}))}
                               />
@@ -689,10 +689,10 @@ export default function Home() {
                       </div>
                     </div>
                   ))}
-                  <div className="pt-4 sticky bottom-0 bg-[#0F172A]">
+                  <div className="pt-4 sticky bottom-0 bg-[map-surface]">
                     <button 
                       onClick={session ? handleMultiSave : () => signIn("google")} 
-                      className="w-full bg-[#FF6B6B] text-white py-5 rounded-2xl font-bold shadow-xl shadow-[#FF6B6B]/30 active:scale-95 transition-all"
+                      className="w-full bg-[sple-red] text-white py-5 rounded-2xl font-bold shadow-xl shadow-[sple-red]/30 active:scale-95 transition-all"
                     >
                       {session 
                         ? `${selectedAnalyzedIndices.length}개의 장소 저장하기` 
