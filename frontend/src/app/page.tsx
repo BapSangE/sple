@@ -463,7 +463,7 @@ export default function Home() {
 
       {/* Bottom Sheet */}
       <motion.div 
-        className="absolute bottom-0 w-full bg-[#0F172A]/95 backdrop-blur-2xl rounded-t-[24px] shadow-[0_-20px_60px_rgba(0,0,0,0.5)] z-50 flex flex-col border-t border-[#1E293B]"
+        className="absolute bottom-0 w-full bg-[#0F172A]/95 backdrop-blur-2xl rounded-t-[24px] shadow-[0_-20px_60px_rgba(0,0,0,0.5)] z-[110] flex flex-col border-t border-[#1E293B]"
         animate={{ height: isBottomSheetMinimized ? '80px' : (selectedPlace ? '75%' : (places.length > 0 ? '50%' : '340px')) }}
         transition={{ type: "spring", damping: 30, stiffness: 150 }}
       >
@@ -563,7 +563,7 @@ export default function Home() {
       {/* Modal */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="absolute inset-0 z-[100] flex justify-center items-end bg-black/80 backdrop-blur-md sm:items-center p-4">
+          <div className="absolute inset-0 z-[200] flex justify-center items-end bg-black/80 backdrop-blur-md sm:items-center p-4">
             <motion.div 
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               className="w-full sm:max-w-md bg-[#0F172A] rounded-[32px] p-8 border border-[#1E293B] shadow-2xl"
