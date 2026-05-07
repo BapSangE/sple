@@ -98,18 +98,24 @@ app = FastAPI(title="Sple API Server", lifespan=lifespan)
 app.include_router(auth.router)
 
 # CORS 설정: 운영 도메인 허용
+allowed_origins = [
+    os.getenv("FRONTEND_URL"),
+    "https://sple-insta.com",
+    "https://www.sple-insta.com",
+    "http://sple-insta.com",
+    "http://www.sple-insta.com",
+    "http://localhost:3000"
+]
+# None 값 제거
+allowed_origins = [origin for origin in allowed_origins if origin]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        FRONTEND_URL,
-        "https://sple-insta.com",
-        "https://www.sple-insta.com",
-        "http://sple-insta.com",
-        "http://localhost:3000"
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # 현재 파일의 디렉토리 경로 가져오기
