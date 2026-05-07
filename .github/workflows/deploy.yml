@@ -9,10 +9,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -20,7 +20,7 @@ jobs:
 
       - name: Login to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and Push Docker image
         env:
@@ -30,17 +30,15 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-      # --- 여기서부터 환경변수 반영 로직 추가 ---
+      # --- 인프라 환경 변수 반영 로직 ---
 
-      # 1. 여기서 jq 명령어를 파이프(|)로 연결해 불필요한 값들을 싹 날려줍니다.
       - name: Download current Task Definition
         run: |
           aws ecs describe-task-definition --task-definition default-sple-backend-6440 --query taskDefinition | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy, .enableFaultInjection)' > task-definition.json
 
-      # 2. v1 -> v2 로 버전을 올려줍니다 (Node.js 구버전 경고 해결)
       - name: Fill in the new image ID and Environment Variables in the Amazon ECS task definition
         id: task-def
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        uses: aws-actions/amazon-ecs-render-task-definition@v5
         with:
           task-definition: task-definition.json
           container-name: Main
@@ -50,10 +48,10 @@ jobs:
             GCP_SA_KEY_JSON=${{ secrets.GCP_SA_KEY_JSON }}
             GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
             GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+            NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
 
-      # 3. 여기도 v1 -> v2 로 올려줍니다.
       - name: Deploy to Amazon ECS
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v5
         with:
           task-definition: ${{ steps.task-def.outputs.task-definition }}
           service: sple-backend-6440

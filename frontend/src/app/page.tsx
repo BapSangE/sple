@@ -381,7 +381,7 @@ export default function Home() {
                     className="cursor-pointer"
                     onClick={() => setSelectedPlace(p)}
                   >
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all ${isSelected ? 'bg-[#FF6B6B] text-white scale-110' : 'bg-[#0F172A] text-[#FF6B6B] border border-[#1E293B]'}`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all ${isSelected ? 'bg-[#FF6B6B] text-white scale-110' : 'bg-[#0F172A] text-[#FF6B6B] border border-map-border'}`}>
                       <CatIcon size={20} strokeWidth={2.5} />
                     </div>
                   </div>
@@ -393,7 +393,7 @@ export default function Home() {
       </main>
 
       {/* Top Navigation */}
-      <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 py-3 bg-[#0F172A]/80 backdrop-blur-xl border-b border-[#1E293B]/50 shadow-sm">
+      <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 py-3 bg-[#0F172A]/80 backdrop-blur-xl border-b border-map-border/50 shadow-sm">
         <div className="flex items-center">
           <div className="text-[#FF6B6B]">
             <MapPin size={24} fill="currentColor" />
@@ -402,7 +402,7 @@ export default function Home() {
         </div>
 
         <div className="flex-1 max-w-md mx-4">
-          <div className="bg-[#0F172A]/60 backdrop-blur-2xl border border-[#1E293B] rounded-full flex items-center px-4 py-2 hover:bg-[#0F172A]/80 transition-all">
+          <div className="bg-[#0F172A]/60 backdrop-blur-2xl border border-map-border rounded-full flex items-center px-4 py-2 hover:bg-[#0F172A]/80 transition-all">
             <Search className="text-[#94A3B8] mr-2" size={18} />
             <input 
               id="search-input"
@@ -428,7 +428,7 @@ export default function Home() {
             className={`flex-shrink-0 px-5 py-2 rounded-full text-sm font-medium transition-all active:scale-95 ${
               selectedCategoryIds.includes(cat.id) 
                 ? "bg-[#FF6B6B] text-white shadow-lg shadow-[#FF6B6B]/20" 
-                : "bg-[#0F172A]/60 backdrop-blur-xl border border-[#1E293B] text-white hover:bg-[#0F172A]/80"
+                : "bg-[#0F172A]/60 backdrop-blur-xl border border-map-border text-white hover:bg-[#0F172A]/80"
             }`}
           >
             {cat.label}
@@ -458,13 +458,13 @@ export default function Home() {
 
       {/* Map Controls */}
       <div className="absolute top-[160px] right-4 flex flex-col gap-2 z-40">
-        <div className="bg-[#0F172A]/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-[#1E293B] flex flex-col overflow-hidden">
-          <button onClick={() => mapInstance?.setLevel(mapInstance.getLevel() - 1)} className="p-3 text-white hover:bg-white/10 border-b border-[#1E293B]"><Plus size={20} /></button>
+        <div className="bg-[#0F172A]/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-map-border flex flex-col overflow-hidden">
+          <button onClick={() => mapInstance?.setLevel(mapInstance.getLevel() - 1)} className="p-3 text-white hover:bg-white/10 border-b border-map-border"><Plus size={20} /></button>
           <button onClick={() => mapInstance?.setLevel(mapInstance.getLevel() + 1)} className="p-3 text-white hover:bg-white/10"><Minus size={20} /></button>
         </div>
         <button 
           onClick={() => navigator.geolocation.getCurrentPosition(pos => setMapCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }))}
-          className="bg-[#0F172A]/80 backdrop-blur-xl p-3 rounded-full text-white shadow-2xl border border-[#1E293B] hover:bg-white/10"
+          className="bg-[#0F172A]/80 backdrop-blur-xl p-3 rounded-full text-white shadow-2xl border border-map-border hover:bg-white/10"
         >
           <LocateFixed size={20} />
         </button>
@@ -472,7 +472,7 @@ export default function Home() {
 
       {/* Bottom Sheet */}
       <motion.div 
-        className="absolute bottom-0 w-full bg-[#0F172A]/95 backdrop-blur-2xl rounded-t-[24px] shadow-[0_-20px_60px_rgba(0,0,0,0.5)] z-[110] flex flex-col border-t border-[#1E293B]"
+        className="absolute bottom-0 w-full bg-[#0F172A]/95 backdrop-blur-2xl rounded-t-[24px] shadow-[0_-20px_60px_rgba(0,0,0,0.5)] z-[110] flex flex-col border-t border-map-border"
         animate={{ height: isBottomSheetMinimized ? '80px' : (selectedPlace ? '75%' : (places.length > 0 ? '50%' : '340px')) }}
         transition={{ type: "spring", damping: 30, stiffness: 150 }}
       >
@@ -575,7 +575,7 @@ export default function Home() {
           <div className="absolute inset-0 z-[200] flex justify-center items-end bg-black/80 backdrop-blur-md sm:items-center p-4">
             <motion.div 
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              className="w-full sm:max-w-md bg-[#0F172A] rounded-[32px] p-8 border border-[#1E293B] shadow-2xl"
+              className="w-full sm:max-w-md bg-[#0F172A] rounded-[32px] p-8 border border-map-border shadow-2xl"
             >
               <div className="flex justify-between items-center mb-8">
                 <h3 className="text-2xl font-bold text-white tracking-tight font-display italic">AI 자동 분석</h3>
@@ -597,7 +597,7 @@ export default function Home() {
                       <input 
                         id="url-input"
                         name="url"
-                        className="w-full bg-white/5 border border-[#1E293B] rounded-2xl px-5 py-4 text-white outline-none focus:border-[#FF6B6B]/50 transition-all"
+                        className="w-full bg-white/5 border border-map-border rounded-2xl px-5 py-4 text-white outline-none focus:border-[#FF6B6B]/50 transition-all"
                         placeholder="https://www.instagram.com/p/..."
                         value={urlInput}
                         onChange={(e) => setUrlInput(e.target.value)}
@@ -651,7 +651,7 @@ export default function Home() {
                     >
                       <div className="flex items-start gap-3">
                         <div className={`mt-1 w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all ${
-                          selectedAnalyzedIndices.includes(i) ? "bg-[#FF6B6B] border-[#FF6B6B]" : "border-[#1E293B]"
+                          selectedAnalyzedIndices.includes(i) ? "bg-[#FF6B6B] border-[#FF6B6B]" : "border-map-border"
                         }`}>
                           {selectedAnalyzedIndices.includes(i) && <Check size={14} className="text-white" strokeWidth={4} />}
                         </div>
