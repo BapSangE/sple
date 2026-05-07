@@ -1,114 +1,110 @@
 @import "tailwindcss";
 
 @theme {
-  /* Cinematic Dark Palette from design guide */
+  /* Brand Colors */
   --color-sple-red: #FF6B6B;
-  --color-map-surface: #0F172A;
-  --color-map-border: #1E293B;
-  --color-map-bg: #000000;
-  
-  --color-primary: #FF6B6B;
-  --color-secondary: #6B4EFF;
-  --color-tertiary: #00D09E;
+  --color-smart-purple: #6B4EFF;
+  --color-guide-mint: #00D09E;
 
-  --color-slate-94A3B8: #94A3B8;
+  /* Surface & Background */
+  --color-background: #1c1010;
+  --color-surface: #1c1010;
+  --color-surface-container-lowest: #160b0b;
+  --color-surface-container-low: #251818;
+  --color-surface-container: #291c1c;
+  --color-surface-container-high: #352726;
+  --color-surface-container-highest: #403130;
+  --color-glass-bg: rgba(15, 23, 42, 0.8);
+  --color-overlay-dim: rgba(0, 0, 0, 0.4);
+
+  --color-primary: #ffb3b0;
+  --color-on-primary: #68000f;
+  --color-primary-container: #ff6b6b;
+  --color-on-primary-container: #6d0010;
   
+  --color-on-surface: #f5dddb;
+  --color-on-surface-variant: #e0bfbd;
+  --color-outline: #a78a88;
+  --color-outline-variant: #584140;
+
   /* Fonts */
-  --font-display: var(--font-epilogue);
-  --font-body: var(--font-be-vietnam-pro);
+  --font-title-sm: "Plus Jakarta Sans", sans-serif;
+  --font-headline-md: "Plus Jakarta Sans", sans-serif;
+  --font-display-lg: "Plus Jakarta Sans", sans-serif;
+  --font-label-sm: "Plus Jakarta Sans", sans-serif;
+  --font-body-md: "Plus Jakarta Sans", sans-serif;
+
+  /* Font Sizes */
+  --text-display-lg: 32px;
+  --text-display-lg--line-height: 1.2;
+  --text-display-lg--font-weight: 700;
+
+  --text-headline-md: 24px;
+  --text-headline-md--line-height: 1.3;
+  --text-headline-md--font-weight: 600;
+
+  --text-title-sm: 18px;
+  --text-title-sm--line-height: 1.4;
+  --text-title-sm--font-weight: 600;
+
+  --text-body-md: 16px;
+  --text-body-md--line-height: 1.6;
+  --text-body-md--font-weight: 400;
+
+  --text-label-sm: 13px;
+  --text-label-sm--line-height: 1.2;
+  --text-label-sm--letter-spacing: 0.02em;
+  --text-label-sm--font-weight: 500;
+
+  /* Spacing */
+  --spacing-stack-sm: 8px;
+  --spacing-gutter: 12px;
+  --spacing-stack-md: 16px;
+  --spacing-safe-margin: 20px;
+  --spacing-stack-lg: 24px;
+
+  /* Radius */
+  --radius-sm: 0.25rem;
+  --radius-DEFAULT: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+  --radius-full: 9999px;
 }
 
 :root {
-  --font-epilogue: "Epilogue", sans-serif;
-  --font-be-vietnam-pro: "Be Vietnam Pro", sans-serif;
+  --font-plus-jakarta: "Plus Jakarta Sans", sans-serif;
 }
 
 body {
-  background-color: #000000;
-  color: #f5dddb;
-  font-family: var(--font-be-vietnam-pro);
+  background-color: var(--color-background);
+  color: var(--color-on-surface);
+  font-family: var(--font-plus-jakarta);
   margin: 0;
   padding: 0;
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3, h4, .font-display {
-  font-family: var(--font-epilogue);
-}
-
-/* Custom Utilities from code.html */
-@utility glass-panel {
-  background-color: rgba(15, 23, 42, 0.8);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(30, 41, 59, 1);
-}
-
-@utility glass-floating {
-  background-color: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
-  border: 1px solid rgba(30, 41, 59, 1);
-}
-
-@utility skeleton-shimmer {
-  background: linear-gradient(90deg, #0F172A 25%, #1E293B 50%, #0F172A 75%);
-  background-size: 200% 100%;
-  animation: shimmer 2s infinite;
-}
-
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-@utility no-scrollbar {
+/* Custom Utilities */
+@utility hide-scrollbar {
   &::-webkit-scrollbar { display: none; }
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
 
-/* Map Markers */
-.marker-pin {
-  width: 44px;
-  height: 44px;
-  border-radius: 50% 50% 50% 0;
-  background: #FF6B6B;
-  position: absolute;
-  transform: rotate(-45deg);
-  left: 50%;
-  top: 50%;
-  margin: -22px 0 0 -22px;
-  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease-out;
+@utility shimmer {
+  background: linear-gradient(to right, var(--color-surface-container-high) 8%, var(--color-surface-container-highest) 18%, var(--color-surface-container-high) 33%);
+  background-size: 1000px 100%;
+  animation: shimmer-anim 2.5s infinite linear forwards;
 }
 
-.marker-pin::after {
-  content: '';
-  width: 36px;
-  height: 36px;
-  background: #0F172A; /* Dark theme internal circle */
-  border-radius: 50%;
-  position: absolute;
+@keyframes shimmer-anim {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
 }
-
-.marker-icon {
-  z-index: 1;
-  transform: rotate(45deg);
-  color: #FF6B6B;
-}
-
-.marker-selected {
-  transform: rotate(-45deg) scale(1.2);
-  background: #6B4EFF;
-  box-shadow: 0 6px 20px rgba(107, 78, 255, 0.5);
-}
-
-.marker-selected::after { background: #6B4EFF; }
-.marker-selected .marker-icon { color: #FFFFFF; }
 
 /* Material Symbols Adjustments */
 .material-symbols-outlined {
@@ -117,6 +113,6 @@ h1, h2, h3, h4, .font-display {
   line-height: 1;
 }
 
-.fill-icon {
+.material-symbols-outlined.fill {
   font-variation-settings: 'FILL' 1;
 }

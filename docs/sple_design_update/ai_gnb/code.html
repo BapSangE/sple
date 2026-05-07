@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Place Detail View - AI Highlight Master</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-fixed": "#410006",
+                        "on-surface-variant": "#e0bfbd",
+                        "surface-bright": "#453635",
+                        "glass-bg": "rgba(15, 23, 42, 0.8)",
+                        "secondary-fixed": "#e5deff",
+                        "outline": "#a78a88",
+                        "on-tertiary-fixed": "#002116",
+                        "sple-red": "#FF6B6B",
+                        "surface-container-low": "#251818",
+                        "on-error-container": "#ffdad6",
+                        "overlay-dim": "rgba(0, 0, 0, 0.4)",
+                        "on-secondary-fixed": "#190064",
+                        "surface-container-lowest": "#160b0b",
+                        "primary": "#ffb3b0",
+                        "on-tertiary": "#003828",
+                        "on-tertiary-container": "#003b2a",
+                        "guide-mint": "#00D09E",
+                        "surface-container": "#291c1c",
+                        "surface-tint": "#ffb3b0",
+                        "on-primary": "#68000f",
+                        "inverse-primary": "#ae2f34",
+                        "surface-variant": "#403130",
+                        "surface-dark": "#0F172A",
+                        "on-surface": "#f5dddb",
+                        "inverse-on-surface": "#3b2d2c",
+                        "outline-variant": "#584140",
+                        "tertiary-container": "#00b085",
+                        "primary-container": "#ff6b6b",
+                        "on-primary-container": "#6d0010",
+                        "secondary-container": "#4411d9",
+                        "on-secondary": "#2c009e",
+                        "surface": "#1c1010",
+                        "secondary-fixed-dim": "#c8bfff",
+                        "tertiary": "#2fe0ac",
+                        "on-primary-fixed-variant": "#8c1520",
+                        "on-secondary-container": "#b9afff",
+                        "tertiary-fixed": "#59fdc7",
+                        "background": "#1c1010",
+                        "on-tertiary-fixed-variant": "#00513c",
+                        "primary-fixed-dim": "#ffb3b0",
+                        "smart-purple": "#6B4EFF",
+                        "on-secondary-fixed-variant": "#4109d7",
+                        "surface-container-high": "#352726",
+                        "surface-container-highest": "#403130",
+                        "inverse-surface": "#f5dddb",
+                        "secondary": "#c8bfff",
+                        "error": "#ffb4ab",
+                        "on-error": "#690005",
+                        "primary-fixed": "#ffdad8",
+                        "tertiary-fixed-dim": "#2fe0ac",
+                        "surface-dim": "#1c1010",
+                        "on-background": "#f5dddb",
+                        "error-container": "#93000a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-md": "16px",
+                        "stack-sm": "8px",
+                        "gutter": "12px",
+                        "bottom-sheet-full": "95%",
+                        "stack-lg": "24px",
+                        "safe-margin": "20px",
+                        "bottom-sheet-peek": "80px",
+                        "bottom-sheet-half": "50%"
+                    },
+                    "fontFamily": {
+                        "title-sm": ["Plus Jakarta Sans"],
+                        "headline-md": ["Plus Jakarta Sans"],
+                        "display-lg": ["Plus Jakarta Sans"],
+                        "label-sm": ["Plus Jakarta Sans"],
+                        "body-md": ["Plus Jakarta Sans"]
+                    },
+                    "fontSize": {
+                        "title-sm": ["18px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "display-lg": ["32px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                        "label-sm": ["13px", {"lineHeight": "1.2", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen overflow-hidden antialiased">
+<!-- Top Navigation / Header -->
+<div class="fixed top-4 left-4 right-4 z-50 flex justify-between items-center px-safe-margin py-2 bg-glass-bg backdrop-blur-xl rounded-xl shadow-md">
+<button class="w-10 h-10 flex items-center justify-center rounded-full bg-surface-container-highest text-on-surface hover:bg-surface-variant/20 transition-all scale-95 duration-200 ease-out">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 0;">arrow_back</span>
+</button>
+<span class="font-headline-md text-headline-md text-on-surface">Details</span>
+<button class="w-10 h-10 flex items-center justify-center rounded-full bg-surface-container-highest text-on-surface hover:bg-surface-variant/20 transition-all scale-95 duration-200 ease-out">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 0;">more_horiz</span>
+</button>
+</div>
+<!-- Main Content Container (Full Screen Bottom Sheet Equivalent) -->
+<main class="h-screen w-full flex flex-col bg-surface relative pt-20 pb-[100px] overflow-y-auto hide-scrollbar">
+<!-- High-Res Image Carousel -->
+<section class="w-full relative h-[40vh] min-h-[300px]">
+<div class="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar h-full w-full">
+<div class="min-w-full h-full snap-center relative">
+<img alt="Place detail view showing a modern aesthetic setting." class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida/ADBb0ujvprlocNIJiRcmX9ZzCvO4aaGD_4TruZuuiUy8LWviOzQs3Flis4da5kcoN2LJGRe--B9znWR9HIcx_xI69Xbs_4tyu4MuSjF8wC0i6dc8kwQQDeMjLaIdX8i2jHL23KYETPPJzMk3EUPfbBwEOFcmz8GbFTf8TWTtx0AOzOdOCRZF0yhSFlk9bxfmMAMAOqz707CEMvPDHscxC_BVGgcM12j2CrFMG4p3M5n2OLTOLtwqqsVaq-TBrHou"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent"></div>
+</div>
+<div class="min-w-full h-full snap-center relative">
+<img alt="Secondary place detail view highlighting architectural features." class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida/ADBb0ugkbsmPUarsWoDE-TyAozuuQ9VwCQiCLl712PH5Z-nvXEHPni40qsYQJ3yxJaGENnEtgjjWOhGBEUaxrSPS-e5YW2jbkMWuNgiS8hgIG3lnApPV2RgSWKPCgY_w0kTxNvq1_gUs4Dbmz7Oz_PMikYq7ps2Pm6DiHYNxcP1SdJp3RXzp_b_TrpNiXvRfaQlK52_JMCPS-3N9ehqiRTXVyOcrIBMgDmzPQip4FqydlmvHzWozjX-LWGcTgoU"/>
+<div class="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent"></div>
+</div>
+</div>
+<!-- Carousel Indicators -->
+<div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+<div class="w-2 h-2 rounded-full bg-on-background"></div>
+<div class="w-2 h-2 rounded-full bg-on-surface-variant/50"></div>
+<div class="w-2 h-2 rounded-full bg-on-surface-variant/50"></div>
+</div>
+</section>
+<!-- Content Area -->
+<div class="px-safe-margin flex flex-col gap-stack-lg -mt-8 relative z-20">
+<!-- Header Info -->
+<div class="flex flex-col gap-stack-sm">
+<div class="flex justify-between items-start">
+<h1 class="font-display-lg text-display-lg text-on-surface">Neon Genesis Cafe</h1>
+<div class="flex items-center gap-1 bg-surface-container-highest px-3 py-1 rounded-full">
+<span class="material-symbols-outlined text-sple-red text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-sm text-label-sm text-on-surface">4.8</span>
+</div>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">Cyberpunk-themed artisanal coffee shop located in the heart of the tech district. Features pour-over specials and neon-lit ambience.</p>
+<!-- Tags -->
+<div class="flex flex-wrap gap-2 mt-2">
+<span class="px-3 py-1 bg-surface-container-high rounded-full font-label-sm text-label-sm text-on-surface-variant">Cafe</span>
+<span class="px-3 py-1 bg-surface-container-high rounded-full font-label-sm text-label-sm text-on-surface-variant">Cyberpunk</span>
+<span class="px-3 py-1 bg-surface-container-high rounded-full font-label-sm text-label-sm text-on-surface-variant">$$</span>
+</div>
+</div>
+<!-- AI Highlight Panel (Core Section) -->
+<div class="relative overflow-hidden rounded-xl bg-smart-purple/10 border border-smart-purple/30 p-stack-md backdrop-blur-md">
+<!-- Pulse Effect Background -->
+<div class="absolute inset-0 bg-gradient-to-br from-smart-purple/20 to-transparent opacity-50"></div>
+<div class="relative z-10 flex flex-col gap-stack-sm">
+<div class="flex items-center gap-2 text-smart-purple">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<span class="font-title-sm text-title-sm font-bold">AI Highlight</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface">Based on your preferences, you'll love their signature "Quantum Cold Brew". The atmosphere is perfect for deep work sessions, though it gets crowded after 3 PM. Known for exceptional ambient lighting.</p>
+<!-- AI Extracted Insights -->
+<div class="grid grid-cols-2 gap-gutter mt-2">
+<div class="flex items-center gap-2 bg-surface-container-highest/50 rounded-lg p-2">
+<span class="material-symbols-outlined text-guide-mint text-[16px]">wifi</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Fast Wi-Fi</span>
+</div>
+<div class="flex items-center gap-2 bg-surface-container-highest/50 rounded-lg p-2">
+<span class="material-symbols-outlined text-guide-mint text-[16px]">power</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Outlets Info</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Practical Info Grid (Bento Style) -->
+<div class="grid grid-cols-2 gap-gutter">
+<!-- Hours -->
+<div class="bg-surface-container-low rounded-xl p-stack-md flex flex-col gap-1 border border-surface-container-highest">
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">schedule</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-2">Open Now</span>
+<span class="font-title-sm text-title-sm text-on-surface">08:00 - 22:00</span>
+</div>
+<!-- Location -->
+<div class="bg-surface-container-low rounded-xl p-stack-md flex flex-col gap-1 border border-surface-container-highest">
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">location_on</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-2">Distance</span>
+<span class="font-title-sm text-title-sm text-on-surface">1.2 km away</span>
+</div>
+</div>
+<!-- Image Grid -->
+<div class="grid grid-cols-3 gap-2 mt-2 rounded-xl overflow-hidden">
+<img alt="Interior view of the cafe highlighting the seating arrangement." class="w-full h-24 object-cover" src="https://lh3.googleusercontent.com/aida/ADBb0uhmZWV84EhyRL_I-fglbk8Pl3_Cku5Usf4qLAaEji1Avr0OfHYmb_VYbHnTljBZ4AG91HQ0mjKe0Pac3i65w2g2gBjRVbjxeMAxBGJpWCl2h55vmgtHEaTGmt7fDFXHBr1vUx-XVcFz9V9l8iBB_pazyr8zXt2X0MldmgF6CSaafwt0kNLnEAl6ysBvo0pCzY-VfW4L04wJHCcelBUIXpWm5x0YNgJBWWUcrMU3AmgiI9rXYCTkDLj18Og"/>
+<img alt="Close up of a signature coffee drink served in a unique glass." class="w-full h-24 object-cover" src="https://lh3.googleusercontent.com/aida/ADBb0uie3ulwBdtlhgFZxUp3tz9qHQwVf71fwDBNTYSYUELBCevhTZwP7JO-JdWdA2jo7JVQeMm4lZuLgEMfjsJDM79J8nFRV5LeigHCna3dpTXCc6gko8PMaSHPHZeywmINTk0Rnr_nV71FvPTyJGLO6xXarNax6VutAWmNBoUwWqLvfhkg7I2S4j-5KxV4RHAAy2YV1C9rpgjIp4Y5uxs1QadqxpJU9nJ_qjvbnExsV1iTXGZpSesLbths_fY"/>
+<div class="relative w-full h-24">
+<img alt="Exterior shot of the cafe entrance at night with neon signage." class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida/ADBb0ui5pGLwz0B2QC69UL_56zew3VPd8hPiJHA6JdNlmq5pcokgsVNxD6VHU2rLZMJgAEJUllpl7RBE911A6lI4zCrNi4KDrCMpVb4YMXBhVvig4JFgFXGhL-lX_KprRTCKm9H1jJ_szor-kxfVZeCDLNgU4lSk-Kbg-e9HL8H6XTkLM3HYgLKMvWnUV8x6wgZWQCxwBIMnutxNdOVdHukim8jDL9jRENE_ypRzeXFvGvCsYMEne9ZQfVqCNIw"/>
+<div class="absolute inset-0 bg-surface/80 flex items-center justify-center">
+<span class="font-title-sm text-title-sm text-on-surface">+12</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating Action Buttons Area (Fixed Bottom) -->
+<div class="fixed bottom-0 left-0 right-0 p-safe-margin bg-gradient-to-t from-background via-background/90 to-transparent z-50">
+<div class="flex gap-gutter max-w-md mx-auto">
+<!-- Save Button (Secondary) -->
+<button class="flex-1 h-14 bg-surface-container-highest text-on-surface rounded-full flex items-center justify-center gap-2 font-title-sm text-title-sm backdrop-blur-xl border border-surface-variant hover:bg-surface-variant/50 transition-all active:scale-95 duration-200">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">bookmark_add</span>
+<span>Save</span>
+</button>
+<!-- Navigate Button (Primary) -->
+<button class="flex-[2] h-14 bg-sple-red text-on-primary rounded-full flex items-center justify-center gap-2 font-title-sm text-title-sm font-bold shadow-lg shadow-sple-red/20 hover:bg-sple-red/90 transition-all active:scale-95 duration-200">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">near_me</span>
+<span>Navigate</span>
+</button>
+<!-- Share Button (Icon only) -->
+<button class="w-14 h-14 bg-surface-container-highest text-on-surface rounded-full flex items-center justify-center backdrop-blur-xl border border-surface-variant hover:bg-surface-variant/50 transition-all active:scale-95 duration-200">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">share</span>
+</button>
+</div>
+</div>
+</body></html>

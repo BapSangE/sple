@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>My Profile &amp; Collections Master</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-fixed": "#410006",
+                        "on-surface-variant": "#e0bfbd",
+                        "surface-bright": "#453635",
+                        "glass-bg": "rgba(15, 23, 42, 0.8)",
+                        "secondary-fixed": "#e5deff",
+                        "outline": "#a78a88",
+                        "on-tertiary-fixed": "#002116",
+                        "sple-red": "#FF6B6B",
+                        "surface-container-low": "#251818",
+                        "on-error-container": "#ffdad6",
+                        "overlay-dim": "rgba(0, 0, 0, 0.4)",
+                        "on-secondary-fixed": "#190064",
+                        "surface-container-lowest": "#160b0b",
+                        "primary": "#ffb3b0",
+                        "on-tertiary": "#003828",
+                        "on-tertiary-container": "#003b2a",
+                        "guide-mint": "#00D09E",
+                        "surface-container": "#291c1c",
+                        "surface-tint": "#ffb3b0",
+                        "on-primary": "#68000f",
+                        "inverse-primary": "#ae2f34",
+                        "surface-variant": "#403130",
+                        "surface-dark": "#0F172A",
+                        "on-surface": "#f5dddb",
+                        "inverse-on-surface": "#3b2d2c",
+                        "outline-variant": "#584140",
+                        "tertiary-container": "#00b085",
+                        "primary-container": "#ff6b6b",
+                        "on-primary-container": "#6d0010",
+                        "secondary-container": "#4411d9",
+                        "on-secondary": "#2c009e",
+                        "surface": "#1c1010",
+                        "secondary-fixed-dim": "#c8bfff",
+                        "tertiary": "#2fe0ac",
+                        "on-primary-fixed-variant": "#8c1520",
+                        "on-secondary-container": "#b9afff",
+                        "tertiary-fixed": "#59fdc7",
+                        "background": "#1c1010",
+                        "on-tertiary-fixed-variant": "#00513c",
+                        "primary-fixed-dim": "#ffb3b0",
+                        "smart-purple": "#6B4EFF",
+                        "on-secondary-fixed-variant": "#4109d7",
+                        "surface-container-high": "#352726",
+                        "surface-container-highest": "#403130",
+                        "inverse-surface": "#f5dddb",
+                        "secondary": "#c8bfff",
+                        "error": "#ffb4ab",
+                        "on-error": "#690005",
+                        "primary-fixed": "#ffdad8",
+                        "tertiary-fixed-dim": "#2fe0ac",
+                        "surface-dim": "#1c1010",
+                        "on-background": "#f5dddb",
+                        "error-container": "#93000a"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px",
+                        "2xl": "1rem",
+                        "3xl": "1.5rem"
+                    },
+                    "spacing": {
+                        "stack-md": "16px",
+                        "stack-sm": "8px",
+                        "gutter": "12px",
+                        "bottom-sheet-full": "95%",
+                        "stack-lg": "24px",
+                        "safe-margin": "20px",
+                        "bottom-sheet-peek": "80px",
+                        "bottom-sheet-half": "50%"
+                    },
+                    "fontFamily": {
+                        "title-sm": ["Plus Jakarta Sans", "sans-serif"],
+                        "headline-md": ["Plus Jakarta Sans", "sans-serif"],
+                        "display-lg": ["Plus Jakarta Sans", "sans-serif"],
+                        "label-sm": ["Plus Jakarta Sans", "sans-serif"],
+                        "body-md": ["Plus Jakarta Sans", "sans-serif"]
+                    },
+                    "fontSize": {
+                        "title-sm": ["18px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "display-lg": ["32px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                        "label-sm": ["13px", {"lineHeight": "1.2", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Shimmer Animation CSS */
+        @keyframes shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
+        .shimmer {
+            background: linear-gradient(to right, theme('colors.surface-container-high') 8%, theme('colors.surface-container-highest') 18%, theme('colors.surface-container-high') 33%);
+            background-size: 1000px 100%;
+            animation: shimmer 2.5s infinite linear forwards;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md antialiased min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="fixed top-4 left-4 right-4 rounded-xl bg-glass-bg dark:bg-glass-bg backdrop-blur-xl shadow-md z-50 flex justify-between items-center px-safe-margin py-2">
+<button class="text-on-surface dark:text-on-surface hover:bg-surface-variant/20 transition-all scale-95 duration-200 ease-out p-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h1 class="font-display-lg text-display-lg font-bold text-sple-red tracking-tight">Sple</h1>
+<button class="text-on-surface dark:text-on-surface hover:bg-surface-variant/20 transition-all scale-95 duration-200 ease-out p-1 rounded-full flex items-center justify-center">
+<img alt="User profile avatar" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida/ADBb0ui5pGLwz0B2QC69UL_56zew3VPd8hPiJHA6JdNlmq5pcokgsVNxD6VHU2rLZMJgAEJUllpl7RBE911A6lI4zCrNi4KDrCMpVb4YMXBhVvig4JFgFXGhL-lX_KprRTCKm9H1jJ_szor-kxfVZeCDLNgU4lSk-Kbg-e9HL8H6XTkLM3HYgLKMvWnUV8x6wgZWQCxwBIMnutxNdOVdHukim8jDL9jRENE_ypRzeXFvGvCsYMEne9ZQfVqCNIw"/>
+</button>
+</header>
+<!-- Main Canvas Content -->
+<main class="pt-28 px-safe-margin max-w-2xl mx-auto space-y-stack-lg">
+<!-- Profile Header Glassmorphism -->
+<section class="bg-surface-container-low/60 backdrop-blur-md rounded-3xl p-stack-lg shadow-sm flex flex-col items-center text-center relative overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-b from-sple-red/10 to-transparent pointer-events-none"></div>
+<div class="relative w-24 h-24 mb-stack-md">
+<img alt="User Profile Image" class="w-full h-full rounded-full border-4 border-surface object-cover shadow-lg relative z-10" src="https://lh3.googleusercontent.com/aida/ADBb0ui5pGLwz0B2QC69UL_56zew3VPd8hPiJHA6JdNlmq5pcokgsVNxD6VHU2rLZMJgAEJUllpl7RBE911A6lI4zCrNi4KDrCMpVb4YMXBhVvig4JFgFXGhL-lX_KprRTCKm9H1jJ_szor-kxfVZeCDLNgU4lSk-Kbg-e9HL8H6XTkLM3HYgLKMvWnUV8x6wgZWQCxwBIMnutxNdOVdHukim8jDL9jRENE_ypRzeXFvGvCsYMEne9ZQfVqCNIw"/>
+<div class="absolute inset-0 bg-sple-red rounded-full blur-xl opacity-30"></div>
+</div>
+<h2 class="font-headline-md text-headline-md text-on-surface mb-1">Alex Cartographer</h2>
+<p class="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1 justify-center">
+<span class="material-symbols-outlined text-[16px]">location_on</span>
+                Tokyo, Japan
+            </p>
+<p class="mt-stack-md font-body-md text-body-md text-on-surface-variant max-w-sm">
+                Exploring hidden alleys, vintage coffee shops, and brutalist architecture. Curating the best urban walks.
+            </p>
+<button class="mt-stack-lg bg-sple-red text-on-primary-container px-6 py-3 rounded-full font-label-sm text-label-sm font-bold flex items-center gap-2 shadow-md hover:bg-primary transition-all active:scale-95 group">
+<span class="material-symbols-outlined transition-transform duration-300 group-active:-translate-y-1 group-active:scale-110">share</span>
+                Share Profile Map
+            </button>
+</section>
+<!-- Stats Grid (Bento Style) -->
+<section class="grid grid-cols-3 gap-gutter">
+<!-- Places Saved -->
+<div class="bg-surface-container rounded-2xl p-stack-md flex flex-col items-center justify-center shadow-sm relative overflow-hidden group hover:bg-surface-container-high transition-colors">
+<div class="absolute top-0 right-0 w-16 h-16 bg-sple-red/5 rounded-bl-full pointer-events-none group-hover:bg-sple-red/10 transition-colors"></div>
+<span class="font-display-lg text-display-lg text-sple-red">142</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-1 text-center">Places Saved</span>
+</div>
+<!-- My Maps -->
+<div class="bg-surface-container rounded-2xl p-stack-md flex flex-col items-center justify-center shadow-sm relative overflow-hidden group hover:bg-surface-container-high transition-colors">
+<div class="absolute top-0 right-0 w-16 h-16 bg-smart-purple/5 rounded-bl-full pointer-events-none group-hover:bg-smart-purple/10 transition-colors"></div>
+<span class="font-display-lg text-display-lg text-on-surface">12</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-1 text-center">My Maps</span>
+</div>
+<!-- Followers -->
+<div class="bg-surface-container rounded-2xl p-stack-md flex flex-col items-center justify-center shadow-sm relative overflow-hidden group hover:bg-surface-container-high transition-colors">
+<div class="absolute top-0 right-0 w-16 h-16 bg-guide-mint/5 rounded-bl-full pointer-events-none group-hover:bg-guide-mint/10 transition-colors"></div>
+<span class="font-display-lg text-display-lg text-on-surface">8.4k</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-1 text-center">Followers</span>
+</div>
+</section>
+<!-- My Collections -->
+<section>
+<div class="flex justify-between items-end mb-stack-md">
+<h3 class="font-title-sm text-title-sm text-on-surface">My Collections</h3>
+<button class="font-label-sm text-label-sm text-sple-red hover:text-primary transition-colors flex items-center gap-1">
+                    See All <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+</button>
+</div>
+<div class="grid grid-cols-2 gap-stack-md">
+<!-- Collection Card 1 -->
+<div class="bg-surface-container-low rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer group active:scale-95 duration-200">
+<div class="h-32 relative">
+<img alt="Collection Cover Image" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" src="https://lh3.googleusercontent.com/aida/ADBb0uhmZWV84EhyRL_I-fglbk8Pl3_Cku5Usf4qLAaEji1Avr0OfHYmb_VYbHnTljBZ4AG91HQ0mjKe0Pac3i65w2g2gBjRVbjxeMAxBGJpWCl2h55vmgtHEaTGmt7fDFXHBr1vUx-XVcFz9V9l8iBB_pazyr8zXt2X0MldmgF6CSaafwt0kNLnEAl6ysBvo0pCzY-VfW4L04wJHCcelBUIXpWm5x0YNgJBWWUcrMU3AmgiI9rXYCTkDLj18Og"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest to-transparent"></div>
+<div class="absolute top-3 right-3 bg-glass-bg backdrop-blur-md rounded-full px-2 py-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-sple-red fill">bookmark</span>
+<span class="font-label-sm text-label-sm text-on-surface text-[10px]">24</span>
+</div>
+</div>
+<div class="p-stack-md bg-surface-container-low">
+<h4 class="font-title-sm text-title-sm text-on-surface mb-1">Tokyo Neon Lights</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Night Photography Spots</p>
+</div>
+</div>
+<!-- Collection Card 2 -->
+<div class="bg-surface-container-low rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer group active:scale-95 duration-200">
+<div class="h-32 relative">
+<img alt="Collection Cover Image" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" src="https://lh3.googleusercontent.com/aida/ADBb0ujvprlocNIJiRcmX9ZzCvO4aaGD_4TruZuuiUy8LWviOzQs3Flis4da5kcoN2LJGRe--B9znWR9HIcx_xI69Xbs_4tyu4MuSjF8wC0i6dc8kwQQDeMjLaIdX8i2jHL23KYETPPJzMk3EUPfbBwEOFcmz8GbFTf8TWTtx0AOzOdOCRZF0yhSFlk9bxfmMAMAOqz707CEMvPDHscxC_BVGgcM12j2CrFMG4p3M5n2OLTOLtwqqsVaq-TBrHou"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest to-transparent"></div>
+<div class="absolute top-3 right-3 bg-glass-bg backdrop-blur-md rounded-full px-2 py-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-sple-red fill">bookmark</span>
+<span class="font-label-sm text-label-sm text-on-surface text-[10px]">18</span>
+</div>
+</div>
+<div class="p-stack-md bg-surface-container-low">
+<h4 class="font-title-sm text-title-sm text-on-surface mb-1">Hidden Cafes</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Quiet spots for reading</p>
+</div>
+</div>
+<!-- Collection Card 3 (Skeleton Loading State) -->
+<div class="bg-surface-container-low rounded-3xl overflow-hidden shadow-sm">
+<div class="h-32 shimmer"></div>
+<div class="p-stack-md bg-surface-container-low space-y-2">
+<div class="h-5 w-3/4 shimmer rounded"></div>
+<div class="h-3 w-1/2 shimmer rounded"></div>
+</div>
+</div>
+<!-- Collection Card 4 (Skeleton Loading State) -->
+<div class="bg-surface-container-low rounded-3xl overflow-hidden shadow-sm">
+<div class="h-32 shimmer"></div>
+<div class="p-stack-md bg-surface-container-low space-y-2">
+<div class="h-5 w-2/3 shimmer rounded"></div>
+<div class="h-3 w-3/4 shimmer rounded"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Recent Activity (Asymmetric List) -->
+<section class="mb-8">
+<h3 class="font-title-sm text-title-sm text-on-surface mb-stack-md">Recent Activity</h3>
+<div class="space-y-stack-sm relative before:absolute before:inset-y-0 before:left-[19px] before:w-[2px] before:bg-surface-variant">
+<!-- Activity Item 1 -->
+<div class="flex gap-stack-md relative z-10">
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center border-4 border-background shrink-0 mt-1">
+<span class="material-symbols-outlined text-sple-red text-[18px]">add_location_alt</span>
+</div>
+<div class="bg-surface-container-low p-stack-md rounded-2xl flex-1 shadow-sm flex items-center gap-stack-sm">
+<img alt="Activity Thumbnail" class="w-12 h-12 rounded-lg object-cover" src="https://lh3.googleusercontent.com/aida/ADBb0ugkbsmPUarsWoDE-TyAozuuQ9VwCQiCLl712PH5Z-nvXEHPni40qsYQJ3yxJaGENnEtgjjWOhGBEUaxrSPS-e5YW2jbkMWuNgiS8hgIG3lnApPV2RgSWKPCgY_w0kTxNvq1_gUs4Dbmz7Oz_PMikYq7ps2Pm6DiHYNxcP1SdJp3RXzp_b_TrpNiXvRfaQlK52_JMCPS-3N9ehqiRTXVyOcrIBMgDmzPQip4FqydlmvHzWozjX-LWGcTgoU"/>
+<div>
+<p class="font-body-md text-body-md text-on-surface">Saved <span class="font-semibold">Shibuya Crossing</span></p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">2 hours ago</p>
+</div>
+</div>
+</div>
+<!-- Activity Item 2 -->
+<div class="flex gap-stack-md relative z-10">
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center border-4 border-background shrink-0 mt-1">
+<span class="material-symbols-outlined text-smart-purple text-[18px]">route</span>
+</div>
+<div class="bg-surface-container-low p-stack-md rounded-2xl flex-1 shadow-sm flex items-center gap-stack-sm">
+<img alt="Activity Thumbnail" class="w-12 h-12 rounded-lg object-cover" src="https://lh3.googleusercontent.com/aida/ADBb0uie3ulwBdtlhgFZxUp3tz9qHQwVf71fwDBNTYSYUELBCevhTZwP7JO-JdWdA2jo7JVQeMm4lZuLgEMfjsJDM79J8nFRV5LeigHCna3dpTXCc6gko8PMaSHPHZeywmINTk0Rnr_nV71FvPTyJGLO6xXarNax6VutAWmNBoUwWqLvfhkg7I2S4j-5KxV4RHAAy2YV1C9rpgjIp4Y5uxs1QadqxpJU9nJ_qjvbnExsV1iTXGZpSesLbths_fY"/>
+<div>
+<p class="font-body-md text-body-md text-on-surface">Created map <span class="font-semibold">Weekend Walk</span></p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Yesterday</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="md:hidden fixed bottom-5 left-1/2 -translate-x-1/2 w-[90%] max-w-md z-50 flex justify-around items-center px-4 py-2 bg-glass-bg dark:bg-glass-bg backdrop-blur-xl rounded-full shadow-lg">
+<!-- Map - Inactive -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:bg-white/10 rounded-full transition-all active:scale-95 duration-300" href="#">
+<span class="material-symbols-outlined">map</span>
+<span class="font-label-sm text-label-sm mt-1">Map</span>
+</a>
+<!-- Explore - Inactive -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:bg-white/10 rounded-full transition-all active:scale-95 duration-300" href="#">
+<span class="material-symbols-outlined">explore</span>
+<span class="font-label-sm text-label-sm mt-1">Explore</span>
+</a>
+<!-- Saved - Inactive -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:bg-white/10 rounded-full transition-all active:scale-95 duration-300" href="#">
+<span class="material-symbols-outlined">bookmark</span>
+<span class="font-label-sm text-label-sm mt-1">Saved</span>
+</a>
+<!-- Profile - Active -->
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full p-3 scale-110 shadow-sm transition-all duration-300" href="#">
+<span class="material-symbols-outlined fill">person</span>
+<span class="font-label-sm text-label-sm mt-1 hidden">Profile</span> <!-- Hide text to maintain visual balance for active state as per original design intent or scale it, but strictly following JSON active state style -->
+</a>
+</nav>
+</body></html>

@@ -5,6 +5,7 @@
 ## 1. 계획 및 기획 문서
 - [[docs/PLAN.md]]: Sple 자율형 개발 워크플로우 및 MVP 실행 계획서
 - [[sple_mvp.md]]: Sple MVP 서비스 기획 문서 전문 (유저 플로우, PRD)
+- [[docs/REAL_SERVICE_DESIGN.md]]: Sple 정식 서비스 설계 명세서 (화면 구성 및 UX)
 
 ## 2. 에이전트 규칙
 - [[.agents/rules/agent.md]]: 스플 디자인 연동 원칙 및 로직 규칙

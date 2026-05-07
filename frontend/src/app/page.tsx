@@ -5,11 +5,12 @@ import { useSession, signIn, signOut } from "next-auth/react";
 import { Map, CustomOverlayMap, useKakaoLoader, MarkerClusterer } from "react-kakao-maps-sdk";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Plus, X, Navigation, Bookmark, ArrowLeft, Search, 
   Coffee, Utensils, Wine, ShoppingBag, Camera, Trees, Hotel, 
-  Globe, Sparkles, Check, Map as MapIcon, ExternalLink,
-  Link as LinkIcon, Play, Minus, LocateFixed, ChevronDown, ChevronUp, WifiOff, ClipboardPaste, MapPin
+  Globe, Navigation, MapPin
 } from "lucide-react";
+import { TopAppBar } from "@/components/layout/TopAppBar";
+import { BottomNavBar } from "@/components/layout/BottomNavBar";
+import { FAB } from "@/components/ui/FAB";
 
 const CATEGORIES = [
   { id: "all", label: "전체", icon: Globe },
@@ -46,18 +47,6 @@ const DEMO_PLACES: Place[] = [
     rating: 4.8,
     categories: ["restaurant"],
     detailed_highlights: "• 통통한 새우살이 씹히는 와사비 쉬림프 버거\n• 웨이팅이 길지만 기다릴 가치가 있는 맛\n• 힙한 감성의 매장 분위기"
-  },
-  {
-    id: "demo3",
-    name: "피치스 도원",
-    address: "서울 성동구 연무장3길 9",
-    description: "자동차 문화를 기반으로 한 복합문화공간 및 도넛",
-    url: "https://www.instagram.com/peaches_d8ne",
-    lat: 37.5446,
-    lng: 127.0538,
-    rating: 4.4,
-    categories: ["culture", "cafe"],
-    detailed_highlights: "• 전시된 멋진 자동차들과 인증샷 필수\n• 노티드 도넛과 젤라또를 즐길 수 있는 공간\n• 힙한 스트릿 감성의 결정체"
   }
 ];
 
@@ -86,7 +75,6 @@ export default function Home() {
   });
 
   const [places, setPlaces] = useState<Place[]>([]);
-  const [hasFirstPlace, setHasFirstPlace] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [urlInput, setUrlInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -96,33 +84,19 @@ export default function Home() {
   const [folderInputs, setFolderInputs] = useState<Record<number, string>>({});
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 37.5665, lng: 126.9780 });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [mapBounds, setMapBounds] = useState<any>(null);
   const [visiblePlaces, setVisiblePlaces] = useState<Place[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>(["all"]);
   
-  const [isListView, setIsListView] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [isBottomSheetMinimized, setIsBottomSheetMinimized] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [mapInstance, setMapInstance] = useState<any>(null);
-  const [isOnline, setIsOnline] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setIsOnline(navigator.onLine);
-      const handleOnline = () => setIsOnline(true);
-      const handleOffline = () => setIsOnline(false);
-      window.addEventListener('online', handleOnline);
-      window.addEventListener('offline', handleOffline);
-      return () => {
-        window.removeEventListener('online', handleOnline);
-        window.removeEventListener('offline', handleOffline);
-      };
-    }
-  }, []);
-
-  const triggerHaptic = (type: 'light' | 'medium' | 'success' | 'error' = 'light') => {
+  const triggerHaptic = useCallback((type: 'light' | 'medium' | 'success' | 'error' = 'light') => {
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       switch (type) {
         case 'light': navigator.vibrate(10); break;
@@ -131,18 +105,18 @@ export default function Home() {
         case 'error': navigator.vibrate([50, 50, 50, 50]); break;
       }
     }
-  };
+  }, []);
 
-  const showToast = (msg: string, type: 'light' | 'medium' | 'success' | 'error' = 'light') => {
+  const showToast = useCallback((msg: string, type: 'light' | 'medium' | 'success' | 'error' = 'light') => {
     triggerHaptic(type);
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
-  };
+  }, [triggerHaptic]);
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
     if (!query) {
-      const token = (session as any)?.accessToken;
+      const token = (session as { accessToken?: string })?.accessToken;
       if (token && !isDemoMode) {
         try {
           const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/places`, {
@@ -150,10 +124,10 @@ export default function Home() {
             credentials: "include"
           });
           const data = await res.json();
-          if (data.status === "success") {
-            setPlaces(data.data);
-          }
-        } catch (err) {}
+          if (data.status === "success") setPlaces(data.data);
+        } catch {
+          // ignore
+        }
       } else if (isDemoMode) {
         setPlaces(DEMO_PLACES);
       }
@@ -166,34 +140,37 @@ export default function Home() {
     }
     
     try {
-      const token = (session as any)?.accessToken;
+      const token = (session as { accessToken?: string })?.accessToken;
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search?q=${encodeURIComponent(query)}`, {
         headers: { "Authorization": `Bearer ${token || ""}` },
         credentials: "include"
       });
       const data = await res.json();
-      if (data.status === "success") {
-        setPlaces(data.data);
-      }
+      if (data.status === "success") setPlaces(data.data);
     } catch (err) {
       console.error("Search failed", err);
     }
   };
 
   useEffect(() => {
-    if (window.kakao && window.kakao.maps && window.kakao.maps.LatLng) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (typeof window !== "undefined" && (window as any).kakao && (window as any).kakao.maps && (window as any).kakao.maps.LatLng) {
       const visible = places.filter((p) => {
         const matchesCategory = selectedCategoryIds.includes("all") || (p.categories && selectedCategoryIds.some(id => p.categories.includes(id)));
         if (!matchesCategory) return false;
         if (!mapBounds) return true;
         if (!p.lat || !p.lng) return false;
         try {
-          const position = new window.kakao.maps.LatLng(p.lat, p.lng);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const position = new (window as any).kakao.maps.LatLng(p.lat, p.lng);
           return mapBounds.contain(position);
-        } catch (e) { return true; }
+        } catch { return true; }
       });
-      setVisiblePlaces(visible);
+      // Avoid infinite cascading loop
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setVisiblePlaces(prev => JSON.stringify(prev) !== JSON.stringify(visible) ? visible : prev);
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisiblePlaces(places);
     }
   }, [places, mapBounds, selectedCategoryIds]);
@@ -212,11 +189,8 @@ export default function Home() {
     if (status === "loading" || isDemoMode) return;
     const fetchPlaces = async () => {
       if (!session) { setPlaces([]); return; }
-      const token = (session as any)?.accessToken;
-      if (!token) { 
-        console.error("Session exists but no accessToken found");
-        return; 
-      }
+      const token = (session as { accessToken?: string })?.accessToken;
+      if (!token) return; 
 
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/places`, {
@@ -230,15 +204,13 @@ export default function Home() {
         const data = await res.json();
         if (data.status === "success") {
           setPlaces(data.data);
-          setHasFirstPlace(data.data.length > 0);
         } else { setPlaces([]); }
-      } catch (err) { 
-        console.error("Failed to fetch places:", err);
+      } catch { 
         setPlaces([]); 
       }
     };
     fetchPlaces();
-  }, [session, status, isDemoMode]);
+  }, [session, status, isDemoMode, showToast]);
 
   const handleToggleDemo = () => {
     if (isDemoMode) {
@@ -250,7 +222,8 @@ export default function Home() {
       setPlaces(DEMO_PLACES);
       setMapCenter({ lat: DEMO_PLACES[0].lat, lng: DEMO_PLACES[0].lng });
       if (mapInstance) {
-        mapInstance.setCenter(new window.kakao.maps.LatLng(DEMO_PLACES[0].lat, DEMO_PLACES[0].lng));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        mapInstance.setCenter(new (window as any).kakao.maps.LatLng(DEMO_PLACES[0].lat, DEMO_PLACES[0].lng));
         mapInstance.setLevel(5);
       }
     }
@@ -267,6 +240,7 @@ export default function Home() {
     }
 
     setIsLoading(true);
+    triggerHaptic('medium');
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analyze`, {
         method: "POST",
@@ -281,37 +255,12 @@ export default function Home() {
           setAnalyzedPlaces([]);
         } else {
           setAnalyzedPlaces(data.data); 
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           setSelectedAnalyzedIndices(data.data.map((_: any, i: number) => i)); // 기본 전체 선택
         }
       }
-    } catch (error) { showToast("서버 연결에 실패했습니다."); }
+    } catch { showToast("서버 연결에 실패했습니다.", "error"); }
     finally { setIsLoading(false); }
-  };
-
-  const handleSave = async (place: Place, memo?: string, folder?: string) => {
-    if (!session) { signIn("google"); return; }
-    const token = (session as any)?.accessToken;
-    if (!token) { signOut(); return; }
-
-    try {
-      const placeToSave = { ...place, url: urlInput, user_email: session?.user?.email, memo, folder: folder || '기본 폴더' };
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/save-place`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        credentials: "include",
-        body: JSON.stringify(placeToSave),
-      });
-      const data = await res.json();
-      if (data.status === "success") {
-        showToast(`'${place.name}' 저장 완료!`);
-        if (isDemoMode) setIsDemoMode(false);
-        setPlaces(prev => [{ ...placeToSave, id: Date.now().toString() }, ...prev]);
-        setHasFirstPlace(true);
-        setIsModalOpen(false);
-        setUrlInput("");
-        setAnalyzedPlaces([]);
-      }
-    } catch (error) { showToast("저장 중 오류가 발생했습니다."); }
   };
 
   const handleMultiSave = async () => {
@@ -324,7 +273,7 @@ export default function Home() {
     setIsLoading(true);
     let successCount = 0;
     
-    const token = (session as any)?.accessToken;
+    const token = (session as { accessToken?: string })?.accessToken;
     if (!token) { signIn("google"); return; }
 
     for (const idx of selectedAnalyzedIndices) {
@@ -341,13 +290,14 @@ export default function Home() {
           successCount++;
           setPlaces(prev => [{ ...placeToSave, id: (Date.now() + idx).toString() }, ...prev]);
         }
-      } catch (err) {}
+      } catch {
+        // ignore
+      }
     }
     
     setIsLoading(false);
     if (successCount > 0) {
       showToast(`${successCount}개의 장소가 저장되었습니다!`, "success");
-      setHasFirstPlace(true);
       setIsModalOpen(false);
       setUrlInput("");
       setAnalyzedPlaces([]);
@@ -355,12 +305,17 @@ export default function Home() {
     }
   };
 
-  const isDataEmpty = !hasFirstPlace && !isDemoMode;
-
   return (
-    <div className="relative w-full h-screen bg-black text-[#94A3B8] overflow-hidden selection:bg-[sple-red]/30 font-body-md">
-      {/* Map Background Area */}
-      <main className="absolute inset-0 w-full h-full z-0">
+    <div className="relative w-full h-screen bg-background text-on-surface overflow-hidden selection:bg-sple-red/30 font-body-md">
+      {toastMessage && (
+        <div className="absolute top-28 left-1/2 -translate-x-1/2 bg-surface-container-high border border-guide-mint/30 rounded-full py-2 px-4 shadow-lg flex items-center gap-2 z-50 animate-bounce">
+          <span className="material-symbols-outlined text-guide-mint text-[18px] fill">check_circle</span>
+          <span className="font-label-sm text-label-sm text-on-surface">{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Map Canvas (Background) */}
+      <main className="absolute inset-0 z-0">
         <Map
           center={mapCenter}
           style={{ width: "100%", height: "100%" }}
@@ -377,11 +332,12 @@ export default function Home() {
 
               return p.lat && p.lng && (
                 <CustomOverlayMap key={p.id} position={{ lat: p.lat, lng: p.lng }} yAnchor={1}>
-                  <div 
-                    className="cursor-pointer"
-                    onClick={() => setSelectedPlace(p)}
-                  >
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all ${isSelected ? 'bg-[sple-red] text-white scale-110' : 'bg-[map-surface] text-[sple-red] border border-map-border'}`}>
+                  <div className="cursor-pointer" onClick={() => { setSelectedPlace(p); triggerHaptic('medium'); }}>
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all ${
+                      isSelected 
+                        ? 'bg-sple-red text-white scale-110 shadow-[0_0_15px_rgba(255,107,107,0.5)] border-2 border-sple-red' 
+                        : 'bg-glass-bg backdrop-blur-md text-sple-red border border-sple-red/30 opacity-90'
+                    }`}>
                       <CatIcon size={20} strokeWidth={2.5} />
                     </div>
                   </div>
@@ -392,142 +348,146 @@ export default function Home() {
         </Map>
       </main>
 
-      {/* Top Navigation */}
-      <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 py-3 bg-[map-surface]/80 backdrop-blur-xl border-b border-map-border/50 shadow-sm">
-        <div className="flex items-center">
-          <div className="text-[sple-red]">
-            <MapPin size={24} fill="currentColor" />
-          </div>
-          <span className="ml-2 font-display text-2xl font-bold text-white hidden sm:block">Sple</span>
-        </div>
+      {/* Top App Bar */}
+      <TopAppBar 
+        onProfileClick={() => {
+          if (session) signOut();
+          else signIn("google");
+        }}
+      />
 
-        <div className="flex-1 max-w-md mx-4">
-          <div className="bg-[map-surface]/60 backdrop-blur-2xl border border-map-border rounded-full flex items-center px-4 py-2 hover:bg-[map-surface]/80 transition-all">
-            <Search className="text-[#94A3B8] mr-2" size={18} />
-            <input 
-              id="search-input"
-              name="search"
-              className="bg-transparent border-none outline-none text-sm text-white w-full placeholder-[#94A3B8]/50" 
-              placeholder="어디로 갈까요?" 
-              type="text"
-              value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <button onClick={() => signIn("google")} className="bg-[sple-red] text-white px-5 py-2 rounded-full text-sm font-bold shadow-lg shadow-[sple-red]/20 active:scale-95 transition-all">로그인</button>
-      </header>
-
-      {/* Category Chips */}
-      <div className="fixed top-[74px] left-0 w-full z-40 overflow-x-auto no-scrollbar py-3 flex items-center gap-2 px-4">
-        {CATEGORIES.map(cat => (
-          <button 
-            key={cat.id}
-            onClick={() => setSelectedCategoryIds([cat.id])}
-            className={`shrink-0 px-5 py-2 rounded-full text-sm font-medium transition-all active:scale-95 ${
-              selectedCategoryIds.includes(cat.id) 
-                ? "bg-[sple-red] text-white shadow-lg shadow-[sple-red]/20" 
-                : "bg-[map-surface]/60 backdrop-blur-xl border border-map-border text-white hover:bg-[map-surface]/80"
-            }`}
-          >
-            {cat.label}
+      {/* Smart Search & Filter Layer */}
+      <div className="fixed top-24 left-0 right-0 z-40 px-safe-margin flex flex-col gap-stack-sm pointer-events-none">
+        {/* Search Bar */}
+        <div className="bg-glass-bg backdrop-blur-xl rounded-full p-1 pl-4 pr-1 flex items-center shadow-lg pointer-events-auto border border-outline/10">
+          <span className="material-symbols-outlined text-on-surface-variant mr-2">search</span>
+          <input 
+            className="bg-transparent border-none focus:ring-0 text-on-surface flex-grow font-body-md text-body-md placeholder-on-surface-variant/70 outline-none w-full" 
+            placeholder="어디로 갈까요?" 
+            type="text"
+            value={searchQuery}
+            onChange={(e) => handleSearch(e.target.value)}
+          />
+          <button className="bg-surface-variant text-on-surface rounded-full w-10 h-10 flex items-center justify-center hover:bg-surface-container transition-colors">
+            <span className="material-symbols-outlined">tune</span>
           </button>
-        ))}
-      </div>
+        </div>
 
-      {/* Unified FAB & Mint Tooltip */}
-      <div className="absolute right-4 bottom-[120px] flex flex-col items-end gap-3 z-100">
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: [0, -5, 0] }}
-          transition={{ y: { repeat: Infinity, duration: 2, ease: "easeInOut" } }}
-          className="bg-[#00D09E] text-white text-[12px] font-bold px-4 py-2.5 rounded-2xl shadow-xl relative"
-        >
-          지금 바로 링크를 공유해보세요!
-          <div className="absolute -bottom-2 right-6 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-8 border-t-[#00D09E]" />
-        </motion.div>
-        <button 
-          id="add-link-btn"
-          onClick={() => setIsModalOpen(true)}
-          className="bg-[sple-red] text-white p-4 rounded-full shadow-[0_8px_32px_rgba(255,107,107,0.4)] hover:brightness-110 active:scale-90 transition-all"
-        >
-          <Plus size={28} strokeWidth={3} />
-        </button>
+        {/* Filter Chips */}
+        <div className="flex gap-2 overflow-x-auto hide-scrollbar pointer-events-auto pb-2 -mx-safe-margin px-safe-margin">
+          {CATEGORIES.map(cat => (
+            <button 
+              key={cat.id}
+              onClick={() => setSelectedCategoryIds([cat.id])}
+              className={`font-label-sm text-label-sm px-4 py-2 rounded-full whitespace-nowrap shadow-sm border transition-all active:scale-95 ${
+                selectedCategoryIds.includes(cat.id) 
+                  ? "bg-primary-container text-on-primary-container border-transparent font-bold" 
+                  : "bg-surface-container text-on-surface border-outline/20 hover:bg-surface-container-high"
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Map Controls */}
-      <div className="absolute top-[160px] right-4 flex flex-col gap-2 z-40">
-        <div className="bg-[map-surface]/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-map-border flex flex-col overflow-hidden">
-          <button onClick={() => mapInstance?.setLevel(mapInstance.getLevel() - 1)} className="p-3 text-white hover:bg-white/10 border-b border-map-border"><Plus size={20} /></button>
-          <button onClick={() => mapInstance?.setLevel(mapInstance.getLevel() + 1)} className="p-3 text-white hover:bg-white/10"><Minus size={20} /></button>
-        </div>
+      <div className="absolute top-[160px] right-safe-margin flex flex-col gap-2 z-40">
         <button 
           onClick={() => navigator.geolocation.getCurrentPosition(pos => setMapCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }))}
-          className="bg-[map-surface]/80 backdrop-blur-xl p-3 rounded-full text-white shadow-2xl border border-map-border hover:bg-white/10"
+          className="bg-surface-container/80 backdrop-blur-xl p-3 rounded-full text-on-surface shadow-2xl border border-outline/20 hover:bg-surface-container-high transition-colors"
         >
-          <LocateFixed size={20} />
+          <span className="material-symbols-outlined text-[20px]">my_location</span>
         </button>
       </div>
 
+      {/* FAB */}
+      <FAB onClick={() => setIsModalOpen(true)} className="bottom-24 md:bottom-32" />
+
       {/* Bottom Sheet */}
       <motion.div 
-        className="absolute bottom-0 w-full bg-[map-surface]/95 backdrop-blur-2xl rounded-t-[24px] shadow-[0_-20px_60px_rgba(0,0,0,0.5)] z-110 flex flex-col border-t border-map-border"
-        animate={{ height: isBottomSheetMinimized ? '80px' : (selectedPlace ? '75%' : (places.length > 0 ? '50%' : '340px')) }}
+        className="absolute bottom-0 w-full bg-surface border-t border-outline-variant/30 rounded-t-3xl shadow-2xl z-50 flex flex-col"
+        animate={{ height: isBottomSheetMinimized ? '80px' : (selectedPlace ? '95%' : (places.length > 0 ? '50%' : '340px')) }}
         transition={{ type: "spring", damping: 30, stiffness: 150 }}
       >
-        <div className="w-full flex justify-center py-4 cursor-pointer" onClick={() => setIsBottomSheetMinimized(!isBottomSheetMinimized)}>
-          <div className="w-10 h-1 bg-white/20 rounded-full" />
+        <div className="w-full flex justify-center pt-3 pb-2 shrink-0 touch-none cursor-pointer" onClick={() => setIsBottomSheetMinimized(!isBottomSheetMinimized)}>
+          <div className="w-12 h-1.5 bg-outline-variant rounded-full" />
         </div>
         
-        <div className="px-6 pb-10 overflow-y-auto flex-1 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto hide-scrollbar px-safe-margin pb-24">
           {selectedPlace ? (
-            <div className="text-white">
-              <button onClick={() => setSelectedPlace(null)} className="flex items-center gap-2 text-[#94A3B8] mb-6 hover:text-white transition-colors">
-                <ArrowLeft size={18} /> <span className="text-[10px] font-bold uppercase tracking-widest">돌아가기</span>
-              </button>
-              <h2 className="text-4xl font-bold mb-4 tracking-tight">{selectedPlace.name}</h2>
-              <p className="text-sm text-[#94A3B8] mb-8 flex items-center gap-2">
-                <Navigation size={14} className="text-[sple-red]" /> {selectedPlace.address}
-              </p>
-              
-              <div className="bg-white/5 p-6 rounded-[24px] mb-8 border-none">
-                <p className="text-lg font-medium leading-relaxed italic text-white/90">&quot;{selectedPlace.description}&quot;</p>
+            <div className="flex flex-col gap-stack-lg pt-4 relative">
+              <div className="flex flex-col gap-stack-sm">
+                <button onClick={() => setSelectedPlace(null)} className="flex items-center gap-1 text-on-surface-variant hover:text-on-surface mb-2 w-fit">
+                  <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+                  <span className="font-label-sm text-label-sm uppercase tracking-widest">돌아가기</span>
+                </button>
+                <div className="flex justify-between items-start">
+                  <h1 className="font-display-lg text-display-lg text-on-surface">{selectedPlace.name}</h1>
+                  <div className="flex items-center gap-1 bg-surface-container-highest px-3 py-1 rounded-full">
+                    <span className="material-symbols-outlined text-sple-red text-[16px] fill">star</span>
+                    <span className="font-label-sm text-label-sm text-on-surface">{selectedPlace.rating || 4.5}</span>
+                  </div>
+                </div>
+                <p className="font-body-md text-body-md text-on-surface-variant flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[16px]">location_on</span> {selectedPlace.address}
+                </p>
+                <p className="font-body-md text-body-md text-on-surface mt-2 italic bg-surface-container-low p-4 rounded-xl border border-surface-container-highest">
+                  &quot;{selectedPlace.description}&quot;
+                </p>
               </div>
 
               {selectedPlace.detailed_highlights && (
-                <div className="mb-8">
-                  <div className="flex items-center gap-2 mb-4 text-[#6B4EFF]">
-                    <Sparkles size={18} fill="currentColor" />
-                    <h3 className="text-xs font-bold uppercase tracking-widest">AI 포인트</h3>
-                  </div>
-                  <div className="space-y-3">
-                    {selectedPlace.detailed_highlights.split('\n').map((h, i) => (
-                      <div key={i} className="bg-white/5 p-4 rounded-2xl border-none flex items-start gap-3">
-                        <Check size={14} className="text-[#00D09E] mt-1" />
-                        <p className="text-sm text-[#94A3B8]">{h.replace(/^[•\s-]+/, '')}</p>
-                      </div>
-                    ))}
+                <div className="relative overflow-hidden rounded-xl bg-smart-purple/10 border border-smart-purple/30 p-stack-md backdrop-blur-md">
+                  <div className="absolute inset-0 bg-gradient-to-br from-smart-purple/20 to-transparent opacity-50 pointer-events-none"></div>
+                  <div className="relative z-10 flex flex-col gap-stack-sm">
+                    <div className="flex items-center gap-2 text-smart-purple">
+                      <span className="material-symbols-outlined text-[20px] fill">auto_awesome</span>
+                      <span className="font-title-sm text-title-sm font-bold">AI Highlight</span>
+                    </div>
+                    <div className="space-y-2 mt-2">
+                      {selectedPlace.detailed_highlights.split('\n').map((h, i) => (
+                        <div key={i} className="flex items-start gap-2 bg-surface-container-highest/50 rounded-lg p-3">
+                          <span className="material-symbols-outlined text-guide-mint text-[16px] mt-0.5">check_circle</span>
+                          <span className="font-label-sm text-label-sm text-on-surface-variant leading-relaxed">{h.replace(/^[•\s-]+/, '')}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                <a href={selectedPlace.url} target="_blank" className="bg-white/10 text-white py-4 rounded-2xl flex items-center justify-center gap-2 font-bold hover:bg-white/20 transition-all">
-                  <Bookmark size={18} /> 인스타 원본
+              {/* Bento Grid */}
+              <div className="grid grid-cols-2 gap-gutter mt-2">
+                <div className="bg-surface-container-low rounded-xl p-stack-md flex flex-col gap-1 border border-surface-container-highest">
+                  <span className="material-symbols-outlined text-on-surface-variant text-[20px]">schedule</span>
+                  <span className="font-label-sm text-label-sm text-on-surface-variant mt-2">운영 정보</span>
+                  <span className="font-title-sm text-title-sm text-on-surface">확인 필요</span>
+                </div>
+                <div className="bg-surface-container-low rounded-xl p-stack-md flex flex-col gap-1 border border-surface-container-highest">
+                  <span className="material-symbols-outlined text-on-surface-variant text-[20px]">directions_walk</span>
+                  <span className="font-label-sm text-label-sm text-on-surface-variant mt-2">위치</span>
+                  <span className="font-title-sm text-title-sm text-on-surface">가까움</span>
+                </div>
+              </div>
+
+              {/* Bottom Actions */}
+              <div className="flex gap-gutter mt-4">
+                <a href={selectedPlace.url} target="_blank" className="flex-1 h-14 bg-surface-container-highest text-on-surface rounded-full flex items-center justify-center gap-2 font-title-sm text-title-sm backdrop-blur-xl border border-surface-variant hover:bg-surface-variant/50 transition-all active:scale-95 duration-200">
+                  <span className="material-symbols-outlined">link</span> 원본
                 </a>
-                <a href={`https://map.kakao.com/link/to/${selectedPlace.name},${selectedPlace.lat},${selectedPlace.lng}`} target="_blank" className="bg-[sple-red] text-white py-4 rounded-2xl flex items-center justify-center gap-2 font-bold shadow-lg shadow-[sple-red]/20">
-                  <Navigation size={18} /> 길찾기
+                <a href={`https://map.kakao.com/link/to/${selectedPlace.name},${selectedPlace.lat},${selectedPlace.lng}`} target="_blank" className="flex-[2] h-14 bg-sple-red text-on-primary rounded-full flex items-center justify-center gap-2 font-title-sm text-title-sm font-bold shadow-lg shadow-sple-red/20 hover:bg-sple-red/90 transition-all active:scale-95 duration-200">
+                  <span className="material-symbols-outlined fill">near_me</span> 길찾기
                 </a>
               </div>
             </div>
           ) : places.length > 0 ? (
             <div className="space-y-6 pt-4">
-              <div className="flex justify-between items-center px-1">
-                <h2 className="text-2xl font-bold text-white tracking-tight">{isDemoMode ? "에디터 픽: 성수" : "내 핫플 목록"}</h2>
-                <span className="bg-[sple-red]/20 text-[sple-red] px-3 py-1 rounded-full text-[10px] font-bold">{places.length}개</span>
+              <div className="flex justify-between items-end mb-stack-md">
+                <h2 className="font-headline-md text-headline-md text-on-surface">{isDemoMode ? "에디터 픽: 성수" : "내 핫플 목록"}</h2>
+                <span className="font-label-sm text-label-sm text-sple-red">{places.length}개</span>
               </div>
-              <div className="grid gap-4 pb-12">
+              <div className="grid gap-stack-sm pb-12">
                 {places.map((p) => (
                   <div 
                     key={p.id} 
@@ -536,173 +496,177 @@ export default function Home() {
                       setMapCenter({ lat: p.lat, lng: p.lng });
                       if (mapInstance) mapInstance.setLevel(3);
                     }}
-                    className="flex items-center gap-4 p-5 bg-white/5 rounded-[28px] border border-transparent hover:border-[sple-red]/30 transition-all cursor-pointer group"
+                    className="flex items-center gap-4 p-4 bg-surface-container-low rounded-2xl shadow-sm hover:shadow-md border border-transparent hover:border-sple-red/30 transition-all cursor-pointer group active:scale-95"
                   >
-                    <div className="w-12 h-12 bg-black/40 rounded-2xl flex items-center justify-center text-[sple-red] group-hover:bg-[sple-red] group-hover:text-white transition-all">
-                      <MapPin size={20} />
+                    <div className="w-12 h-12 bg-surface-container-high rounded-xl flex items-center justify-center text-sple-red group-hover:bg-sple-red group-hover:text-white transition-all shrink-0">
+                      <span className="material-symbols-outlined">location_on</span>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <h4 className="font-bold text-white truncate">{p.name}</h4>
-                      <p className="text-xs text-[#94A3B8] truncate mt-1">{p.address}</p>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-title-sm text-title-sm text-on-surface truncate">{p.name}</h4>
+                      <p className="font-label-sm text-label-sm text-on-surface-variant truncate mt-1">{p.address}</p>
                     </div>
-                    <ExternalLink size={16} className="text-white/20 group-hover:text-[sple-red] transition-colors" />
+                    <span className="material-symbols-outlined text-on-surface-variant opacity-50 group-hover:opacity-100 group-hover:text-sple-red transition-all">open_in_new</span>
                   </div>
                 ))}
               </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center text-center pt-4">
-              <div className="w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-6 shadow-2xl relative">
-                <div className="absolute inset-0 rounded-full bg-[sple-red]/20 blur-xl"></div>
-                <Sparkles size={40} className="text-[sple-red] relative z-10" />
+            <div className="flex flex-col items-center text-center pt-8">
+              <div className="w-24 h-24 rounded-full bg-surface-container-low border border-outline-variant/20 flex items-center justify-center mb-stack-lg shadow-xl relative">
+                <div className="absolute inset-0 rounded-full bg-sple-red/20 blur-2xl"></div>
+                <span className="material-symbols-outlined text-[48px] text-sple-red relative z-10">explore</span>
               </div>
-              <h2 className="text-2xl font-bold text-white mb-3 font-display">인스타 핫플을 가장 쉽게 저장하세요</h2>
-              <p className="text-sm text-[#94A3B8] mb-8 leading-relaxed">
-                게시물의 [공유하기] 버튼을 눌러 스플로 보내면<br/>AI가 알아서 찾아드려요!
+              <h2 className="font-display-lg text-display-lg text-on-surface mb-2">당신의 지도를 만드세요</h2>
+              <p className="font-body-md text-body-md text-on-surface-variant mb-stack-lg leading-relaxed max-w-[280px]">
+                인스타그램 링크를 복사하고 + 버튼을 눌러<br/>AI로 핫플을 분석하고 저장해보세요.
               </p>
-              <button onClick={handleToggleDemo} className="w-full max-w-sm bg-[map-surface] border border-[sple-red]/50 text-white py-4 rounded-2xl font-bold hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center gap-2">
-                <span>성수동 에디터 픽 미리보기</span>
-                <ArrowLeft size={18} className="rotate-180 text-[sple-red]" />
+              <button onClick={handleToggleDemo} className="w-full max-w-[280px] bg-surface-variant border border-sple-red/50 text-on-surface py-4 rounded-2xl font-title-sm text-title-sm hover:bg-surface-container-highest active:scale-95 transition-all flex items-center justify-center gap-2">
+                <span>에디터 픽 미리보기</span>
+                <span className="material-symbols-outlined text-[18px] text-sple-red">arrow_forward</span>
               </button>
             </div>
           )}
         </div>
       </motion.div>
 
-      {/* Modal */}
+      {/* Mobile Bottom Nav */}
+      <BottomNavBar />
+
+      {/* Modal for URL Analysis & Save */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="absolute inset-0 z-200 flex justify-center items-end bg-black/80 backdrop-blur-md sm:items-center p-4">
-            <motion.div 
-              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              className="w-full sm:max-w-md bg-[map-surface] rounded-[32px] p-8 border border-map-border shadow-2xl"
-            >
-              <div className="flex justify-between items-center mb-8">
-                <h3 className="text-2xl font-bold text-white tracking-tight font-display italic">AI 자동 분석</h3>
-                <button onClick={() => { setIsModalOpen(false); setAnalyzedPlaces([]); }} className="text-[#94A3B8] hover:text-white"><X size={24} /></button>
+          <>
+            <div className="fixed inset-0 bg-overlay-dim z-[200] backdrop-blur-sm transition-opacity" onClick={() => {setIsModalOpen(false); setAnalyzedPlaces([]);}} />
+            <div className="fixed inset-x-0 bottom-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 z-[210] w-full sm:w-[90%] sm:max-w-md bg-glass-bg backdrop-blur-xl border border-outline-variant/30 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[90vh]">
+              <div className="px-6 pt-6 pb-4 flex justify-between items-center border-b border-outline-variant/20 shrink-0">
+                <h2 className="font-headline-md text-headline-md text-on-surface">장소 분석</h2>
+                <button onClick={() => { setIsModalOpen(false); setAnalyzedPlaces([]); }} className="p-2 rounded-full hover:bg-surface-variant/40 transition-colors text-on-surface-variant">
+                  <span className="material-symbols-outlined">close</span>
+                </button>
               </div>
               
-              {isLoading ? (
-                <div className="py-12 flex flex-col items-center">
-                  <div className="w-16 h-16 bg-[#6B4EFF]/20 rounded-3xl flex items-center justify-center mb-6 animate-pulse">
-                    <Sparkles size={32} className="text-[#6B4EFF]" />
+              <div className="p-6 overflow-y-auto hide-scrollbar flex flex-col gap-stack-lg">
+                {isLoading ? (
+                  <div className="py-12 flex flex-col items-center">
+                    <div className="w-16 h-16 bg-smart-purple/20 rounded-3xl flex items-center justify-center mb-6 animate-pulse border border-smart-purple/30">
+                      <span className="material-symbols-outlined text-[32px] text-smart-purple fill">auto_awesome</span>
+                    </div>
+                    <p className="font-title-sm text-title-sm text-on-surface text-center">AI가 핫플을 분석하고 있어요...</p>
                   </div>
-                  <p className="text-white font-bold">AI가 핫플을 분석하고 있어요...</p>
-                </div>
-              ) : !analyzedPlaces.length ? (
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <label htmlFor="url-input" className="text-xs font-bold text-[#94A3B8] uppercase tracking-widest ml-1">인스타그램 링크</label>
-                    <div className="relative">
-                      <input 
-                        id="url-input"
-                        name="url"
-                        className="w-full bg-white/5 border border-map-border rounded-2xl px-5 py-4 text-white outline-none focus:border-[sple-red]/50 transition-all"
-                        placeholder="https://www.instagram.com/p/..."
-                        value={urlInput}
-                        onChange={(e) => setUrlInput(e.target.value)}
-                      />
-                      <button
-                        onClick={async () => setUrlInput(await navigator.clipboard.readText())}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-white"
-                        title="클립보드에서 붙여넣기"
+                ) : !analyzedPlaces.length ? (
+                  <>
+                    <div className="flex flex-col gap-stack-sm">
+                      <label className="font-label-sm text-label-sm text-on-surface-variant">인스타그램 링크</label>
+                      <div className="relative flex items-center">
+                        <span className="material-symbols-outlined absolute left-4 text-on-surface-variant">link</span>
+                        <input 
+                          className="w-full bg-surface-container-highest/50 border border-outline-variant/50 rounded-xl py-4 pl-12 pr-12 font-body-md text-body-md text-on-surface focus:outline-none focus:border-sple-red focus:ring-1 focus:ring-sple-red transition-all"
+                          placeholder="https://instagram.com/p/..."
+                          value={urlInput}
+                          onChange={(e) => setUrlInput(e.target.value)}
+                        />
+                        <button
+                          onClick={async () => setUrlInput(await navigator.clipboard.readText())}
+                          className="absolute right-4 text-on-surface-variant hover:text-on-surface transition-colors"
+                          title="붙여넣기"
+                        >
+                          <span className="material-symbols-outlined text-[20px]">content_paste</span>
+                        </button>
+                      </div>
+                    </div>
+                    <button onClick={handleAnalyze} className="w-full bg-sple-red text-on-primary-container py-4 rounded-xl font-title-sm text-title-sm shadow-lg shadow-sple-red/20 hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2">
+                      <span className="material-symbols-outlined fill">auto_awesome</span> AI 분석 시작
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex flex-col gap-stack-lg">
+                    {!session && (
+                      <div className="p-4 rounded-xl bg-surface-container-low border border-sple-red/30 flex items-start gap-3">
+                        <span className="material-symbols-outlined text-sple-red text-[20px] shrink-0">wifi_off</span>
+                        <div className="flex flex-col gap-1">
+                          <span className="font-label-sm text-label-sm text-on-surface font-bold">비로그인 모드</span>
+                          <span className="font-label-sm text-label-sm text-on-surface-variant">로그인하지 않으면 장소가 클라우드에 저장되지 않습니다.</span>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="flex justify-between items-end">
+                      <h3 className="font-title-sm text-title-sm text-on-surface">{analyzedPlaces.length}개의 장소를 찾았습니다</h3>
+                      <button 
+                        onClick={() => setSelectedAnalyzedIndices(
+                          selectedAnalyzedIndices.length === analyzedPlaces.length ? [] : analyzedPlaces.map((_, i) => i)
+                        )}
+                        className="font-label-sm text-label-sm text-sple-red hover:underline"
                       >
-                        <ClipboardPaste size={20} />
+                        {selectedAnalyzedIndices.length === analyzedPlaces.length ? "전체 해제" : "전체 선택"}
                       </button>
                     </div>
-                  </div>
-                  <button onClick={handleAnalyze} className="w-full bg-linear-to-r from-[#6B4EFF] to-[#8B74FF] text-white py-5 rounded-2xl font-bold shadow-xl shadow-[#6B4EFF]/20 hover:brightness-110 transition-all">
-                    AI 분석 시작하기
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-4 max-h-[60vh] overflow-y-auto no-scrollbar pt-2">
-                  {!session && (
-                    <div className="mb-4 p-4 rounded-2xl bg-[sple-red]/10 border border-[sple-red]/30 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-[sple-red] flex items-center justify-center shrink-0">
-                        <WifiOff size={16} className="text-white" />
-                      </div>
-                      <p className="text-xs font-bold text-white leading-tight">
-                        로그인하지 않았을 때는 위치 정보가 저장되지 않습니다.<br/>
-                        <span className="opacity-60 font-medium text-[10px]">지금 로그인하고 나만의 핫플 지도를 완성해보세요!</span>
-                      </p>
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center mb-2 px-1">
-                    <p className="text-xs font-bold text-[#94A3B8]">{analyzedPlaces.length}개의 장소를 찾았습니다</p>
-                    <button 
-                      onClick={() => setSelectedAnalyzedIndices(
-                        selectedAnalyzedIndices.length === analyzedPlaces.length ? [] : analyzedPlaces.map((_, i) => i)
-                      )}
-                      className="text-[10px] font-bold text-[sple-red] uppercase tracking-widest"
-                    >
-                      {selectedAnalyzedIndices.length === analyzedPlaces.length ? "전체 해제" : "전체 선택"}
-                    </button>
-                  </div>
-                  {analyzedPlaces.map((p, i) => (
-                    <div 
-                      key={i} 
-                      className={`p-6 rounded-[28px] border transition-all cursor-pointer ${
-                        selectedAnalyzedIndices.includes(i) ? "bg-[sple-red]/10 border-[sple-red]/30" : "bg-white/5 border-white/5"
-                      }`}
-                      onClick={() => setSelectedAnalyzedIndices(prev => 
-                        prev.includes(i) ? prev.filter(idx => idx !== i) : [...prev, i]
-                      )}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className={`mt-1 w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all ${
-                          selectedAnalyzedIndices.includes(i) ? "bg-[sple-red] border-[sple-red]" : "border-map-border"
-                        }`}>
-                          {selectedAnalyzedIndices.includes(i) && <Check size={14} className="text-white" strokeWidth={4} />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h5 className="text-xl font-bold text-white truncate">{p.name}</h5>
-                          <p className="text-xs text-[#94A3B8] flex items-center gap-1.5 font-bold uppercase tracking-tight mt-1">
-                            <Navigation size={12} /> {p.address}
-                          </p>
+
+                    <div className="flex flex-col gap-stack-sm">
+                      {analyzedPlaces.map((p, i) => (
+                        <div 
+                          key={i} 
+                          className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                            selectedAnalyzedIndices.includes(i) ? "bg-sple-red/10 border-sple-red/50" : "bg-surface-container-low border-surface-container-highest"
+                          }`}
+                          onClick={() => setSelectedAnalyzedIndices(prev => 
+                            prev.includes(i) ? prev.filter(idx => idx !== i) : [...prev, i]
+                          )}
+                        >
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                              selectedAnalyzedIndices.includes(i) ? "border-sple-red bg-sple-red" : "border-outline-variant"
+                            }`}>
+                              {selectedAnalyzedIndices.includes(i) && <div className="w-2.5 h-2.5 rounded-full bg-surface" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-title-sm text-title-sm text-on-surface truncate">{p.name}</h4>
+                              <p className="font-label-sm text-label-sm text-on-surface-variant truncate mt-0.5">{p.address}</p>
+                            </div>
+                          </div>
                           
                           {selectedAnalyzedIndices.includes(i) && (
                             <motion.div 
                               initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
-                              className="space-y-2 mt-4"
+                              className="mt-3 flex flex-col gap-2 pl-8"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              <input 
-                                id={`folder-input-${i}`}
-                                name={`folder-${i}`}
-                                placeholder="폴더 지정 (예: 데이트 코스)" 
-                                className="w-full bg-black/30 px-4 py-3 rounded-xl text-xs font-bold outline-none border border-white/10 focus:border-[sple-red]/50 transition-colors text-white"
-                                value={folderInputs[i] || ""}
-                                onChange={(e) => setFolderInputs(prev => ({...prev, [i]: e.target.value}))}
-                              />
-                              <textarea 
-                                id={`memo-input-${i}`}
-                                name={`memo-${i}`}
-                                placeholder="개인 메모 (예: 웨이팅 김)" 
-                                className="w-full bg-black/30 px-4 py-3 rounded-xl text-xs font-bold outline-none border border-white/10 focus:border-[sple-red]/50 transition-colors resize-none h-20 text-white"
-                                value={memoInputs[i] || ""}
-                                onChange={(e) => setMemoInputs(prev => ({...prev, [i]: e.target.value}))}
-                              />
+                              <div className="flex items-center bg-surface-container-highest/50 rounded-lg px-3 py-2 border border-outline-variant/30">
+                                <span className="material-symbols-outlined text-[16px] text-on-surface-variant mr-2">folder</span>
+                                <input 
+                                  placeholder="폴더 (예: 성수 데이트)" 
+                                  className="bg-transparent border-none outline-none font-label-sm text-label-sm text-on-surface w-full"
+                                  value={folderInputs[i] || ""}
+                                  onChange={(e) => setFolderInputs(prev => ({...prev, [i]: e.target.value}))}
+                                />
+                              </div>
+                              <div className="flex items-start bg-surface-container-highest/50 rounded-lg px-3 py-2 border border-outline-variant/30">
+                                <span className="material-symbols-outlined text-[16px] text-on-surface-variant mr-2 mt-0.5">edit_note</span>
+                                <textarea 
+                                  placeholder="개인 메모" 
+                                  className="bg-transparent border-none outline-none font-label-sm text-label-sm text-on-surface w-full resize-none h-16"
+                                  value={memoInputs[i] || ""}
+                                  onChange={(e) => setMemoInputs(prev => ({...prev, [i]: e.target.value}))}
+                                />
+                              </div>
                             </motion.div>
                           )}
                         </div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                  <div className="pt-4 sticky bottom-0 bg-[map-surface]">
+
                     <button 
                       onClick={session ? handleMultiSave : () => signIn("google")} 
-                      className="w-full bg-[sple-red] text-white py-5 rounded-2xl font-bold shadow-xl shadow-[sple-red]/30 active:scale-95 transition-all"
+                      className="w-full bg-sple-red text-on-primary-container py-4 rounded-xl font-title-sm text-title-sm shadow-lg shadow-sple-red/20 hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2 mt-2"
                     >
-                      {session 
-                        ? `${selectedAnalyzedIndices.length}개의 장소 저장하기` 
-                        : "로그인하고 내 지도에 저장"}
+                      <span className="material-symbols-outlined fill">bookmark_add</span>
+                      {session ? `${selectedAnalyzedIndices.length}개의 장소 저장` : "로그인하고 저장하기"}
                     </button>
                   </div>
-                </div>
-              )}
-            </motion.div>
-          </div>
+                )}
+              </div>
+            </div>
+          </>
         )}
       </AnimatePresence>
     </div>

@@ -1,37 +1,32 @@
 import type { Metadata } from "next";
-import { Epilogue, Be_Vietnam_Pro } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 
-const epilogue = Epilogue({ 
+const plusJakarta = Plus_Jakarta_Sans({ 
   subsets: ["latin"], 
-  variable: "--font-epilogue",
-  weight: ["600", "700"]
-});
-
-const beVietnamPro = Be_Vietnam_Pro({ 
-  subsets: ["latin"], 
-  variable: "--font-be-vietnam-pro",
-  weight: ["400", "500", "700"]
+  variable: "--font-plus-jakarta",
+  weight: ["400", "500", "600", "700", "800"]
 });
 
 export const metadata: Metadata = {
-  title: "Sple - 나만의 핫플 지도",
-  description: "인스타그램 맛집 정보를 지도 하나에",
+  title: "Sple - The Fluid Cartographer",
+  description: "인스타그램 맛집 정보를 지도 하나에 유연하게 담다",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "Sple",
   },
 };
 
 export const viewport = {
-  themeColor: "#FF5A5F",
+  themeColor: "#1c1010",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
   viewportFit: "cover",
+  userScalable: false,
 };
 
 export default function RootLayout({
@@ -44,7 +39,7 @@ export default function RootLayout({
       <head>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" />
       </head>
-      <body className={`${epilogue.variable} ${beVietnamPro.variable} font-body antialiased h-screen flex flex-col bg-map-bg text-on-surface`}>
+      <body className={`${plusJakarta.variable} font-body-md antialiased h-screen flex flex-col bg-background text-on-surface`}>
         <script
           dangerouslySetInnerHTML={{
             __html: `
