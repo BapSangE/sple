@@ -4,9 +4,9 @@ import { useEffect, useState, useCallback } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { Map, CustomOverlayMap, useKakaoLoader, MarkerClusterer } from "react-kakao-maps-sdk";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Coffee, Utensils, Wine, ShoppingBag, Camera, Trees, Hotel, 
-  Globe, Navigation, MapPin
+import {
+  Coffee, Utensils, Wine, ShoppingBag, Camera, Trees, Hotel,
+  Globe
 } from "lucide-react";
 import { TopAppBar } from "@/components/layout/TopAppBar";
 import { BottomNavBar } from "@/components/layout/BottomNavBar";
@@ -89,7 +89,7 @@ export default function Home() {
   const [visiblePlaces, setVisiblePlaces] = useState<Place[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>(["all"]);
-  
+
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [isBottomSheetMinimized, setIsBottomSheetMinimized] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -138,7 +138,7 @@ export default function Home() {
       setPlaces(DEMO_PLACES.filter(p => p.name.includes(query) || p.address.includes(query)));
       return;
     }
-    
+
     try {
       const token = (session as { accessToken?: string })?.accessToken;
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/search?q=${encodeURIComponent(query)}`, {
@@ -170,7 +170,6 @@ export default function Home() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisiblePlaces(prev => JSON.stringify(prev) !== JSON.stringify(visible) ? visible : prev);
     } else {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisiblePlaces(places);
     }
   }, [places, mapBounds, selectedCategoryIds]);
@@ -190,23 +189,23 @@ export default function Home() {
     const fetchPlaces = async () => {
       if (!session) { setPlaces([]); return; }
       const token = (session as { accessToken?: string })?.accessToken;
-      if (!token) return; 
+      if (!token) return;
 
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/places`, {
           headers: { "Authorization": `Bearer ${token}` },
           credentials: "include"
         });
-        if (res.status === 401) { 
+        if (res.status === 401) {
           showToast("로그인 세션이 만료되었습니다. 다시 로그인해주세요.", "error");
-          return; 
+          return;
         }
         const data = await res.json();
         if (data.status === "success") {
           setPlaces(data.data);
         } else { setPlaces([]); }
-      } catch { 
-        setPlaces([]); 
+      } catch {
+        setPlaces([]);
       }
     };
     fetchPlaces();
@@ -249,12 +248,12 @@ export default function Home() {
         body: JSON.stringify({ url: urlInput }),
       });
       const data = await res.json();
-      if (data.status === "success") { 
+      if (data.status === "success") {
         if (!data.data || data.data.length === 0) {
           showToast("장소 정보를 찾을 수 없습니다. 다른 게시물로 시도해 주세요.", "error");
           setAnalyzedPlaces([]);
         } else {
-          setAnalyzedPlaces(data.data); 
+          setAnalyzedPlaces(data.data);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           setSelectedAnalyzedIndices(data.data.map((_: any, i: number) => i)); // 기본 전체 선택
         }
@@ -269,10 +268,10 @@ export default function Home() {
       showToast("저장할 장소를 선택해 주세요.", "error");
       return;
     }
-    
+
     setIsLoading(true);
     let successCount = 0;
-    
+
     const token = (session as { accessToken?: string })?.accessToken;
     if (!token) { signIn("google"); return; }
 
@@ -294,7 +293,7 @@ export default function Home() {
         // ignore
       }
     }
-    
+
     setIsLoading(false);
     if (successCount > 0) {
       showToast(`${successCount}개의 장소가 저장되었습니다!`, "success");
@@ -333,11 +332,10 @@ export default function Home() {
               return p.lat && p.lng && (
                 <CustomOverlayMap key={p.id} position={{ lat: p.lat, lng: p.lng }} yAnchor={1}>
                   <div className="cursor-pointer" onClick={() => { setSelectedPlace(p); triggerHaptic('medium'); }}>
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all ${
-                      isSelected 
-                        ? 'bg-sple-red text-white scale-110 shadow-[0_0_15px_rgba(255,107,107,0.5)] border-2 border-sple-red' 
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all ${isSelected
+                        ? 'bg-sple-red text-white scale-110 shadow-[0_0_15px_rgba(255,107,107,0.5)] border-2 border-sple-red'
                         : 'bg-glass-bg backdrop-blur-md text-sple-red border border-sple-red/30 opacity-90'
-                    }`}>
+                      }`}>
                       <CatIcon size={20} strokeWidth={2.5} />
                     </div>
                   </div>
@@ -349,7 +347,7 @@ export default function Home() {
       </main>
 
       {/* Top App Bar */}
-      <TopAppBar 
+      <TopAppBar
         onProfileClick={() => {
           if (session) signOut();
           else signIn("google");
@@ -361,9 +359,9 @@ export default function Home() {
         {/* Search Bar */}
         <div className="bg-glass-bg backdrop-blur-xl rounded-full p-1 pl-4 pr-1 flex items-center shadow-lg pointer-events-auto border border-outline/10">
           <span className="material-symbols-outlined text-on-surface-variant mr-2">search</span>
-          <input 
-            className="bg-transparent border-none focus:ring-0 text-on-surface flex-grow font-body-md text-body-md placeholder-on-surface-variant/70 outline-none w-full" 
-            placeholder="어디로 갈까요?" 
+          <input
+            className="bg-transparent border-none focus:ring-0 text-on-surface flex-grow font-body-md text-body-md placeholder-on-surface-variant/70 outline-none w-full"
+            placeholder="어디로 갈까요?"
             type="text"
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
@@ -376,14 +374,13 @@ export default function Home() {
         {/* Filter Chips */}
         <div className="flex gap-2 overflow-x-auto hide-scrollbar pointer-events-auto pb-2 -mx-safe-margin px-safe-margin">
           {CATEGORIES.map(cat => (
-            <button 
+            <button
               key={cat.id}
               onClick={() => setSelectedCategoryIds([cat.id])}
-              className={`font-label-sm text-label-sm px-4 py-2 rounded-full whitespace-nowrap shadow-sm border transition-all active:scale-95 ${
-                selectedCategoryIds.includes(cat.id) 
-                  ? "bg-primary-container text-on-primary-container border-transparent font-bold" 
+              className={`font-label-sm text-label-sm px-4 py-2 rounded-full whitespace-nowrap shadow-sm border transition-all active:scale-95 ${selectedCategoryIds.includes(cat.id)
+                  ? "bg-primary-container text-on-primary-container border-transparent font-bold"
                   : "bg-surface-container text-on-surface border-outline/20 hover:bg-surface-container-high"
-              }`}
+                }`}
             >
               {cat.label}
             </button>
@@ -393,7 +390,7 @@ export default function Home() {
 
       {/* Map Controls */}
       <div className="absolute top-[160px] right-safe-margin flex flex-col gap-2 z-40">
-        <button 
+        <button
           onClick={() => navigator.geolocation.getCurrentPosition(pos => setMapCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }))}
           className="bg-surface-container/80 backdrop-blur-xl p-3 rounded-full text-on-surface shadow-2xl border border-outline/20 hover:bg-surface-container-high transition-colors"
         >
@@ -405,7 +402,7 @@ export default function Home() {
       <FAB onClick={() => setIsModalOpen(true)} className="bottom-24 md:bottom-32" />
 
       {/* Bottom Sheet */}
-      <motion.div 
+      <motion.div
         className="absolute bottom-0 w-full bg-surface border-t border-outline-variant/30 rounded-t-3xl shadow-2xl z-50 flex flex-col"
         animate={{ height: isBottomSheetMinimized ? '80px' : (selectedPlace ? '95%' : (places.length > 0 ? '50%' : '340px')) }}
         transition={{ type: "spring", damping: 30, stiffness: 150 }}
@@ -413,7 +410,7 @@ export default function Home() {
         <div className="w-full flex justify-center pt-3 pb-2 shrink-0 touch-none cursor-pointer" onClick={() => setIsBottomSheetMinimized(!isBottomSheetMinimized)}>
           <div className="w-12 h-1.5 bg-outline-variant rounded-full" />
         </div>
-        
+
         <div className="flex-1 overflow-y-auto hide-scrollbar px-safe-margin pb-24">
           {selectedPlace ? (
             <div className="flex flex-col gap-stack-lg pt-4 relative">
@@ -489,8 +486,8 @@ export default function Home() {
               </div>
               <div className="grid gap-stack-sm pb-12">
                 {places.map((p) => (
-                  <div 
-                    key={p.id} 
+                  <div
+                    key={p.id}
                     onClick={() => {
                       setSelectedPlace(p);
                       setMapCenter({ lat: p.lat, lng: p.lng });
@@ -518,7 +515,7 @@ export default function Home() {
               </div>
               <h2 className="font-display-lg text-display-lg text-on-surface mb-2">당신의 지도를 만드세요</h2>
               <p className="font-body-md text-body-md text-on-surface-variant mb-stack-lg leading-relaxed max-w-[280px]">
-                인스타그램 링크를 복사하고 + 버튼을 눌러<br/>AI로 핫플을 분석하고 저장해보세요.
+                인스타그램 링크를 복사하고 + 버튼을 눌러<br />AI로 핫플을 분석하고 저장해보세요.
               </p>
               <button onClick={handleToggleDemo} className="w-full max-w-[280px] bg-surface-variant border border-sple-red/50 text-on-surface py-4 rounded-2xl font-title-sm text-title-sm hover:bg-surface-container-highest active:scale-95 transition-all flex items-center justify-center gap-2">
                 <span>에디터 픽 미리보기</span>
@@ -536,7 +533,7 @@ export default function Home() {
       <AnimatePresence>
         {isModalOpen && (
           <>
-            <div className="fixed inset-0 bg-overlay-dim z-[200] backdrop-blur-sm transition-opacity" onClick={() => {setIsModalOpen(false); setAnalyzedPlaces([]);}} />
+            <div className="fixed inset-0 bg-overlay-dim z-[200] backdrop-blur-sm transition-opacity" onClick={() => { setIsModalOpen(false); setAnalyzedPlaces([]); }} />
             <div className="fixed inset-x-0 bottom-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 z-[210] w-full sm:w-[90%] sm:max-w-md bg-glass-bg backdrop-blur-xl border border-outline-variant/30 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[90vh]">
               <div className="px-6 pt-6 pb-4 flex justify-between items-center border-b border-outline-variant/20 shrink-0">
                 <h2 className="font-headline-md text-headline-md text-on-surface">장소 분석</h2>
@@ -544,7 +541,7 @@ export default function Home() {
                   <span className="material-symbols-outlined">close</span>
                 </button>
               </div>
-              
+
               <div className="p-6 overflow-y-auto hide-scrollbar flex flex-col gap-stack-lg">
                 {isLoading ? (
                   <div className="py-12 flex flex-col items-center">
@@ -559,7 +556,7 @@ export default function Home() {
                       <label className="font-label-sm text-label-sm text-on-surface-variant">인스타그램 링크</label>
                       <div className="relative flex items-center">
                         <span className="material-symbols-outlined absolute left-4 text-on-surface-variant">link</span>
-                        <input 
+                        <input
                           className="w-full bg-surface-container-highest/50 border border-outline-variant/50 rounded-xl py-4 pl-12 pr-12 font-body-md text-body-md text-on-surface focus:outline-none focus:border-sple-red focus:ring-1 focus:ring-sple-red transition-all"
                           placeholder="https://instagram.com/p/..."
                           value={urlInput}
@@ -589,10 +586,10 @@ export default function Home() {
                         </div>
                       </div>
                     )}
-                    
+
                     <div className="flex justify-between items-end">
                       <h3 className="font-title-sm text-title-sm text-on-surface">{analyzedPlaces.length}개의 장소를 찾았습니다</h3>
-                      <button 
+                      <button
                         onClick={() => setSelectedAnalyzedIndices(
                           selectedAnalyzedIndices.length === analyzedPlaces.length ? [] : analyzedPlaces.map((_, i) => i)
                         )}
@@ -604,19 +601,17 @@ export default function Home() {
 
                     <div className="flex flex-col gap-stack-sm">
                       {analyzedPlaces.map((p, i) => (
-                        <div 
-                          key={i} 
-                          className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-                            selectedAnalyzedIndices.includes(i) ? "bg-sple-red/10 border-sple-red/50" : "bg-surface-container-low border-surface-container-highest"
-                          }`}
-                          onClick={() => setSelectedAnalyzedIndices(prev => 
+                        <div
+                          key={i}
+                          className={`p-4 rounded-2xl border transition-all cursor-pointer ${selectedAnalyzedIndices.includes(i) ? "bg-sple-red/10 border-sple-red/50" : "bg-surface-container-low border-surface-container-highest"
+                            }`}
+                          onClick={() => setSelectedAnalyzedIndices(prev =>
                             prev.includes(i) ? prev.filter(idx => idx !== i) : [...prev, i]
                           )}
                         >
                           <div className="flex items-center gap-3 mb-2">
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
-                              selectedAnalyzedIndices.includes(i) ? "border-sple-red bg-sple-red" : "border-outline-variant"
-                            }`}>
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${selectedAnalyzedIndices.includes(i) ? "border-sple-red bg-sple-red" : "border-outline-variant"
+                              }`}>
                               {selectedAnalyzedIndices.includes(i) && <div className="w-2.5 h-2.5 rounded-full bg-surface" />}
                             </div>
                             <div className="flex-1 min-w-0">
@@ -624,29 +619,29 @@ export default function Home() {
                               <p className="font-label-sm text-label-sm text-on-surface-variant truncate mt-0.5">{p.address}</p>
                             </div>
                           </div>
-                          
+
                           {selectedAnalyzedIndices.includes(i) && (
-                            <motion.div 
+                            <motion.div
                               initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
                               className="mt-3 flex flex-col gap-2 pl-8"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <div className="flex items-center bg-surface-container-highest/50 rounded-lg px-3 py-2 border border-outline-variant/30">
                                 <span className="material-symbols-outlined text-[16px] text-on-surface-variant mr-2">folder</span>
-                                <input 
-                                  placeholder="폴더 (예: 성수 데이트)" 
+                                <input
+                                  placeholder="폴더 (예: 성수 데이트)"
                                   className="bg-transparent border-none outline-none font-label-sm text-label-sm text-on-surface w-full"
                                   value={folderInputs[i] || ""}
-                                  onChange={(e) => setFolderInputs(prev => ({...prev, [i]: e.target.value}))}
+                                  onChange={(e) => setFolderInputs(prev => ({ ...prev, [i]: e.target.value }))}
                                 />
                               </div>
                               <div className="flex items-start bg-surface-container-highest/50 rounded-lg px-3 py-2 border border-outline-variant/30">
                                 <span className="material-symbols-outlined text-[16px] text-on-surface-variant mr-2 mt-0.5">edit_note</span>
-                                <textarea 
-                                  placeholder="개인 메모" 
+                                <textarea
+                                  placeholder="개인 메모"
                                   className="bg-transparent border-none outline-none font-label-sm text-label-sm text-on-surface w-full resize-none h-16"
                                   value={memoInputs[i] || ""}
-                                  onChange={(e) => setMemoInputs(prev => ({...prev, [i]: e.target.value}))}
+                                  onChange={(e) => setMemoInputs(prev => ({ ...prev, [i]: e.target.value }))}
                                 />
                               </div>
                             </motion.div>
@@ -655,8 +650,8 @@ export default function Home() {
                       ))}
                     </div>
 
-                    <button 
-                      onClick={session ? handleMultiSave : () => signIn("google")} 
+                    <button
+                      onClick={session ? handleMultiSave : () => signIn("google")}
                       className="w-full bg-sple-red text-on-primary-container py-4 rounded-xl font-title-sm text-title-sm shadow-lg shadow-sple-red/20 hover:opacity-90 transition-all active:scale-95 flex items-center justify-center gap-2 mt-2"
                     >
                       <span className="material-symbols-outlined fill">bookmark_add</span>

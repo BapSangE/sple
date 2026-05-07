@@ -1,6 +1,5 @@
 import httpx
 import asyncio
-import json
 
 async def simulate_instagram_dm():
     """메타(Meta) 서버가 보내는 Webhook 페이로드를 흉내내어 로컬 서버로 전송합니다."""

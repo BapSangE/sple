@@ -3,7 +3,6 @@ from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from starlette.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 import os
 import logging
@@ -19,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import or_
 
-from database import init_db, get_db, async_session, Place
+from database import init_db, get_db, Place
 import auth
 
 # .env 파일 로드
@@ -131,14 +130,14 @@ class PlaceSaveRequest(BaseModel):
     address: str
     description: str
     url: str
-    lat: float = None
-    lng: float = None
+    lat: float | None = None
+    lng: float | None = None
     rating: float = 0.0
     tags: list = []
     categories: list = []
     detailed_highlights: str = ""
-    user_email: str = None
-    memo: str = None
+    user_email: str | None = None
+    memo: str | None = None
     folder: str = "기본 폴더"
 
 # --- Utility Functions ---
@@ -176,7 +175,8 @@ async def get_instagram_metadata(url: str):
 
 async def extract_place_info(text: str):
     """Gemini를 사용하여 장소 정보를 정밀 추출하고 위경도 좌표를 유추합니다."""
-    if not client or not text: return None
+    if not client or not text:
+        return None
 
     prompt = f"""
     당신은 한국의 핫플레이스와 맛집 정보를 전문적으로 수집하는 데이터 엔지니어입니다.
@@ -219,7 +219,8 @@ async def extract_place_info(text: str):
 
 async def send_ig_reply(recipient_id: str, message_text: str):
     """인스타그램 DM으로 자동 답장을 보냅니다."""
-    if not IG_PAGE_ACCESS_TOKEN: return
+    if not IG_PAGE_ACCESS_TOKEN:
+        return
     url = f"https://graph.facebook.com/v19.0/me/messages?access_token={IG_PAGE_ACCESS_TOKEN}"
     payload = {"recipient": {"id": recipient_id}, "message": {"text": message_text}}
     async with httpx.AsyncClient() as client_http:
@@ -270,14 +271,18 @@ async def get_places(user: dict = Depends(get_current_user), db: AsyncSession = 
         # Parse JSON strings back to lists for frontend compatibility
         for p in places_data:
             if p.get('tags'):
-                try: p['tags'] = json.loads(p['tags'])
-                except: p['tags'] = []
+                try:
+                    p['tags'] = json.loads(p['tags'])
+                except Exception:
+                    p['tags'] = []
             if p.get('categories'):
-                try: p['categories'] = json.loads(p['categories'])
-                except: p['categories'] = []
+                try:
+                    p['categories'] = json.loads(p['categories'])
+                except Exception:
+                    p['categories'] = []
                 
         return JSONResponse(content={"status": "success", "data": places_data})
-    except Exception as e:
+    except Exception:
         logger.exception("Error fetching places from DB")
         return JSONResponse(content={"status": "error", "message": "장소 목록을 불러오는 중 오류가 발생했습니다."}, status_code=500)
 
@@ -310,7 +315,7 @@ async def save_place_api(request: PlaceSaveRequest, user: dict = Depends(get_cur
             categories=json.dumps(request.categories),
             detailed_highlights=request.detailed_highlights,
             user_email=user.get("email"),
-            user_id=int(user.get("sub")) if user.get("sub") else None,
+            user_id=int(str(user.get("sub"))) if user.get("sub") else None,
             memo=request.memo,
             folder=request.folder
         )
@@ -342,11 +347,15 @@ async def search_places(q: str = "", user: dict = Depends(get_current_user), db:
         places_data = [row_to_dict(p) for p in places]
         for p in places_data:
             if p.get('tags'):
-                try: p['tags'] = json.loads(p['tags'])
-                except: p['tags'] = []
+                try:
+                    p['tags'] = json.loads(p['tags'])
+                except Exception:
+                    p['tags'] = []
             if p.get('categories'):
-                try: p['categories'] = json.loads(p['categories'])
-                except: p['categories'] = []
+                try:
+                    p['categories'] = json.loads(p['categories'])
+                except Exception:
+                    p['categories'] = []
                 
         return JSONResponse(content={"status": "success", "data": places_data})
     except Exception as e:

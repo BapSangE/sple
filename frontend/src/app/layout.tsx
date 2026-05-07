@@ -37,6 +37,7 @@ export default function RootLayout({
   return (
     <html lang="ko" className="dark">
       <head>
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" />
       </head>
       <body className={`${plusJakarta.variable} font-body-md antialiased h-screen flex flex-col bg-background text-on-surface`}>
