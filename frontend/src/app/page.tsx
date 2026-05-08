@@ -69,7 +69,7 @@ export default function Home() {
       {/* Input Section */}
       <div className="w-full max-w-[320px] flex flex-col gap-4">
         {/* Gradient Border Input */}
-        <div className="w-full rounded-2xl p-[2px] bg-gradient-to-r from-[#ffafbd] to-[#d6bcff]">
+        <div className="w-full rounded-2xl p-[2px] bg-[#FF8D50]">
           <div className="w-full h-full bg-[#f8f9fa] rounded-[14px] overflow-hidden flex items-center">
             <input
               type="text"
