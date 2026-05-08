@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import AdBanner from "@/components/AdBanner";
 
 interface Place {
   name: string;
@@ -13,12 +14,14 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [places, setPlaces] = useState<Place[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [showSheet, setShowSheet] = useState(false);
 
   const handleExtract = async () => {
     if (!url.trim()) return;
     setIsLoading(true);
     setError(null);
     setPlaces([]);
+    setShowSheet(false);
 
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analyze`, {
@@ -30,8 +33,9 @@ export default function Home() {
       
       if (data.status === "success" && data.data && data.data.length > 0) {
         setPlaces(data.data);
+        setShowSheet(true);
       } else {
-        setError("장소 정보를 추출하지 못했습니다. 다른 링크를 시도해 주세요.");
+        setError("앗! 장소 정보를 찾지 못했어요. 상호명이 본문에 적힌 다른 링크로 시도해 주세요! 📍");
       }
     } catch (err) {
       setError("서버 연결에 실패했습니다.");
@@ -70,8 +74,7 @@ export default function Home() {
       </div>
 
       {/* 입력 및 버튼 폼 영역 */}
-      <div className="w-[292px] flex flex-col gap-3">
-        {/* 링크 입력창 */}
+      <div className="w-[292px] flex flex-col gap-3 z-10">
         <input
           type="text"
           value={url}
@@ -80,7 +83,6 @@ export default function Home() {
           className="w-full h-[48px] px-5 text-base text-gray-800 bg-[#F1F1F1] border border-[#FF8747] rounded-[16px] focus:outline-none focus:ring-[1px] focus:ring-[#FF8747] placeholder-gray-900/50"
         />
 
-        {/* 장소 추출 버튼 */}
         <button 
           onClick={handleExtract}
           disabled={isLoading || !url.trim()}
@@ -99,51 +101,112 @@ export default function Home() {
         </button>
       </div>
 
-      {/* Results Section */}
-      <div className="w-full max-w-[320px] mt-8 min-h-[100px]">
-        <AnimatePresence mode="wait">
-          {error && !isLoading && (
+      {/* 에러 메시지 */}
+      <AnimatePresence>
+        {error && !isLoading && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="mt-6 p-4 bg-red-50 border border-red-200 rounded-2xl text-center text-red-600 text-sm max-w-[292px]"
+          >
+            {error}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 바텀 시트 (결과창) - 라이트 모드 디자인 적용 */}
+      <AnimatePresence>
+        {showSheet && (
+          <>
+            {/* Backdrop */}
             <motion.div
-              key="error"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="p-4 bg-red-50 border border-red-200 rounded-2xl text-center text-red-600 text-sm"
-            >
-              {error}
-            </motion.div>
-          )}
-
-          {!isLoading && places.length > 0 && (
+              exit={{ opacity: 0 }}
+              onClick={() => setShowSheet(false)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm z-40"
+            />
+            
+            {/* Sheet Content */}
             <motion.div
-              key="results"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-4"
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="absolute bottom-0 left-0 right-0 bg-white shadow-[0_-10px_40px_rgba(0,0,0,0.1)] rounded-t-[24px] z-50 px-6 pb-10 pt-4"
             >
-              {places.map((place, idx) => (
-                <div key={idx} className="bg-white border border-[#FF8246]/30 rounded-2xl p-5 shadow-sm flex flex-col gap-3">
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-1">{place.name}</h3>
-                    <p className="text-sm text-gray-600">{place.address}</p>
-                  </div>
-                  <a
-                    href={getNaverMapUrl(place)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full bg-[#03C75A] text-white font-bold py-3 rounded-xl text-center hover:opacity-90 active:scale-95 transition-all text-sm flex items-center justify-center gap-2"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path fillRule="evenodd" clipRule="evenodd" d="M12.4452 7.02534C13.1848 7.45266 13.1848 8.54734 12.4452 8.97466L4.54518 13.5381C3.80554 13.9655 2.88098 13.4181 2.88098 12.5635L2.88098 3.43653C2.88098 2.58189 3.80554 2.03454 4.54518 2.46186L12.4452 7.02534Z" fill="white"/>
-                    </svg>
-                    네이버 지도로 보기
-                  </a>
-                </div>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+              {/* Grabber bar */}
+              <div className="w-full flex justify-center mb-6">
+                <div className="w-[40px] h-[5px] bg-gray-300 rounded-full" />
+              </div>
 
+              <div className="mb-6">
+                <h2 className="text-gray-900 text-[20px] font-bold mb-1">장소 정보를 확인해 주세요!</h2>
+                <p className="text-gray-500 text-sm">추출된 장소 중 이동할 곳을 선택하세요.</p>
+              </div>
+
+              <div className="flex flex-col gap-4 max-h-[50vh] overflow-y-auto pr-1 custom-scrollbar">
+                {places.map((place, idx) => (
+                  <motion.div 
+                    key={idx}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                    className="p-5 bg-white border border-[#FF8246]/30 shadow-sm rounded-2xl flex flex-col gap-3 group hover:border-[#FF6B1B] transition-all"
+                  >
+                    <div>
+                      <h3 className="text-gray-900 text-lg font-bold group-hover:text-[#FF6B1B] transition-colors">{place.name}</h3>
+                      <p className="text-gray-600 text-sm mt-1 flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        {place.address}
+                      </p>
+                    </div>
+                    
+                    <a
+                      href={getNaverMapUrl(place)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full h-[48px] bg-[#03C75A] text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.97] transition-all text-sm"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z"/>
+                      </svg>
+                      네이버 지도로 확인하기
+                    </a>
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* 스폰서 광고 (개발 환경에서는 플레이스홀더로 보임) */}
+              <AdBanner dataAdSlot="YOUR_AD_SLOT_ID_HERE" />
+              
+              <button 
+                onClick={() => setShowSheet(false)}
+                className="w-full mt-2 py-4 text-gray-500 font-medium text-sm hover:text-gray-800 transition-colors"
+              >
+                닫기
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #E2E8F0;
+          border-radius: 10px;
+        }
+      `}</style>
     </main>
   );
 }
