@@ -36,20 +36,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" className="dark">
+    <html lang="ko">
       <head>
+        {/* 구글 애드센스 소유권 확인 및 스크립트 로드 */}
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3515900005800180" crossOrigin="anonymous"></script>
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" />
       </head>
-      <body className={`${pretendard.variable} font-sans antialiased h-screen flex flex-col bg-background text-on-surface`}>
-        {process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID && (
-          <Script
-            async
-            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID}`}
-            crossOrigin="anonymous"
-            strategy="afterInteractive"
-          />
-        )}
+      <body className={`${pretendard.variable} font-sans antialiased h-screen flex flex-col bg-white text-gray-900`}>
         <script
           dangerouslySetInnerHTML={{
             __html: `

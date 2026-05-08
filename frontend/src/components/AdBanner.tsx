@@ -33,7 +33,7 @@ export default function AdBanner({
   }
 
   return (
-    <div className="w-full mt-4 rounded-xl overflow-hidden">
+    <div className="w-full mt-4 rounded-xl overflow-hidden min-h-[100px]">
       <ins
         className="adsbygoogle"
         style={{ display: "block" }}

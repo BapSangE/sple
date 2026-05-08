@@ -182,7 +182,9 @@ export default function Home() {
               </div>
 
               {/* 스폰서 광고 (개발 환경에서는 플레이스홀더로 보임) */}
-              <AdBanner dataAdSlot="YOUR_AD_SLOT_ID_HERE" />
+              <div className="min-h-[100px] w-full">
+                <AdBanner dataAdSlot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_ID || ""} />
+              </div>
               
               <button 
                 onClick={() => setShowSheet(false)}
