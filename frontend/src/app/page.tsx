@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { Map, CustomOverlayMap, useKakaoLoader, MarkerClusterer } from "react-kakao-maps-sdk";
 import { motion, AnimatePresence } from "framer-motion";
@@ -84,16 +84,13 @@ export default function Home() {
   const [folderInputs, setFolderInputs] = useState<Record<number, string>>({});
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 37.5665, lng: 126.9780 });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [mapBounds, setMapBounds] = useState<any>(null);
-  const [visiblePlaces, setVisiblePlaces] = useState<Place[]>([]);
+  const [mapBounds, setMapBounds] = useState<kakao.maps.LatLngBounds | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>(["all"]);
 
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [isBottomSheetMinimized, setIsBottomSheetMinimized] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [mapInstance, setMapInstance] = useState<any>(null);
+  const [mapInstance, setMapInstance] = useState<kakao.maps.Map | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const triggerHaptic = useCallback((type: 'light' | 'medium' | 'success' | 'error' = 'light') => {
@@ -152,26 +149,21 @@ export default function Home() {
     }
   };
 
-  useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (typeof window !== "undefined" && (window as any).kakao && (window as any).kakao.maps && (window as any).kakao.maps.LatLng) {
-      const visible = places.filter((p) => {
-        const matchesCategory = selectedCategoryIds.includes("all") || (p.categories && selectedCategoryIds.some(id => p.categories.includes(id)));
-        if (!matchesCategory) return false;
-        if (!mapBounds) return true;
-        if (!p.lat || !p.lng) return false;
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const position = new (window as any).kakao.maps.LatLng(p.lat, p.lng);
+  // 필터링된 장소 목록을 useMemo로 관리하여 useEffect 내 setState 경고 제거
+  const visiblePlaces = useMemo(() => {
+    return places.filter((p) => {
+      const matchesCategory = selectedCategoryIds.includes("all") || (p.categories && selectedCategoryIds.some(id => p.categories.includes(id)));
+      if (!matchesCategory) return false;
+      if (!mapBounds) return true;
+      if (!p.lat || !p.lng) return false;
+      try {
+        if (typeof window !== "undefined" && window.kakao && window.kakao.maps) {
+          const position = new window.kakao.maps.LatLng(p.lat, p.lng);
           return mapBounds.contain(position);
-        } catch { return true; }
-      });
-      // Avoid infinite cascading loop
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setVisiblePlaces(prev => JSON.stringify(prev) !== JSON.stringify(visible) ? visible : prev);
-    } else {
-      setVisiblePlaces(places);
-    }
+        }
+        return true;
+      } catch { return true; }
+    });
   }, [places, mapBounds, selectedCategoryIds]);
 
   useEffect(() => {
@@ -221,8 +213,7 @@ export default function Home() {
       setPlaces(DEMO_PLACES);
       setMapCenter({ lat: DEMO_PLACES[0].lat, lng: DEMO_PLACES[0].lng });
       if (mapInstance) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        mapInstance.setCenter(new (window as any).kakao.maps.LatLng(DEMO_PLACES[0].lat, DEMO_PLACES[0].lng));
+        mapInstance.setCenter(new window.kakao.maps.LatLng(DEMO_PLACES[0].lat, DEMO_PLACES[0].lng));
         mapInstance.setLevel(5);
       }
     }
@@ -254,8 +245,7 @@ export default function Home() {
           setAnalyzedPlaces([]);
         } else {
           setAnalyzedPlaces(data.data);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          setSelectedAnalyzedIndices(data.data.map((_: any, i: number) => i)); // 기본 전체 선택
+          setSelectedAnalyzedIndices(data.data.map((_: Place, i: number) => i)); // 기본 전체 선택
         }
       }
     } catch { showToast("서버 연결에 실패했습니다.", "error"); }
@@ -333,7 +323,7 @@ export default function Home() {
                 <CustomOverlayMap key={p.id} position={{ lat: p.lat, lng: p.lng }} yAnchor={1}>
                   <div className="cursor-pointer" onClick={() => { setSelectedPlace(p); triggerHaptic('medium'); }}>
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all ${isSelected
-                        ? 'bg-sple-red text-white scale-110 shadow-[0_0_15px_rgba(255,107,107,0.5)] border-2 border-sple-red'
+                        ? 'bg-sple-red text-white scale-110 shadow-[0_0_15px_#ff6b6b80] border-2 border-sple-red'
                         : 'bg-glass-bg backdrop-blur-md text-sple-red border border-sple-red/30 opacity-90'
                       }`}>
                       <CatIcon size={20} strokeWidth={2.5} />
@@ -359,13 +349,16 @@ export default function Home() {
         {/* Search Bar */}
         <div className="bg-glass-bg backdrop-blur-xl rounded-full p-1 pl-4 pr-1 flex items-center shadow-lg pointer-events-auto border border-outline/10">
           <span className="material-symbols-outlined text-on-surface-variant mr-2">search</span>
+          <label htmlFor="main-search-input" className="sr-only">장소 검색</label>
           <input
-            className="bg-transparent border-none focus:ring-0 text-on-surface flex-grow font-body-md text-body-md placeholder-on-surface-variant/70 outline-none w-full"
+            id="main-search-input"
+            className="bg-transparent border-none focus:ring-0 text-on-surface grow font-body-md text-body-md placeholder:text-on-surface-variant/70 outline-none"
             placeholder="어디로 갈까요?"
             type="text"
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
           />
+
           <button className="bg-surface-variant text-on-surface rounded-full w-10 h-10 flex items-center justify-center hover:bg-surface-container transition-colors">
             <span className="material-symbols-outlined">tune</span>
           </button>
@@ -436,7 +429,7 @@ export default function Home() {
 
               {selectedPlace.detailed_highlights && (
                 <div className="relative overflow-hidden rounded-xl bg-smart-purple/10 border border-smart-purple/30 p-stack-md backdrop-blur-md">
-                  <div className="absolute inset-0 bg-gradient-to-br from-smart-purple/20 to-transparent opacity-50 pointer-events-none"></div>
+                  <div className="absolute inset-0 bg-linear-to-br from-smart-purple/20 to-transparent opacity-50 pointer-events-none"></div>
                   <div className="relative z-10 flex flex-col gap-stack-sm">
                     <div className="flex items-center gap-2 text-smart-purple">
                       <span className="material-symbols-outlined text-[20px] fill">auto_awesome</span>
@@ -470,10 +463,10 @@ export default function Home() {
 
               {/* Bottom Actions */}
               <div className="flex gap-gutter mt-4">
-                <a href={selectedPlace.url} target="_blank" className="flex-1 h-14 bg-surface-container-highest text-on-surface rounded-full flex items-center justify-center gap-2 font-title-sm text-title-sm backdrop-blur-xl border border-surface-variant hover:bg-surface-variant/50 transition-all active:scale-95 duration-200">
+                <a href={selectedPlace.url} target="_blank" rel="noreferrer" className="flex-1 h-14 bg-surface-container-highest text-on-surface rounded-full flex items-center justify-center gap-2 font-title-sm text-title-sm backdrop-blur-xl border border-surface-variant hover:bg-surface-variant/50 transition-all active:scale-95 duration-200">
                   <span className="material-symbols-outlined">link</span> 원본
                 </a>
-                <a href={`https://map.kakao.com/link/to/${selectedPlace.name},${selectedPlace.lat},${selectedPlace.lng}`} target="_blank" className="flex-[2] h-14 bg-sple-red text-on-primary rounded-full flex items-center justify-center gap-2 font-title-sm text-title-sm font-bold shadow-lg shadow-sple-red/20 hover:bg-sple-red/90 transition-all active:scale-95 duration-200">
+                <a href={`https://map.kakao.com/link/to/${selectedPlace.name},${selectedPlace.lat},${selectedPlace.lng}`} target="_blank" rel="noreferrer" className="flex-2 h-14 bg-sple-red text-on-primary rounded-full flex items-center justify-center gap-2 font-title-sm text-title-sm font-bold shadow-lg shadow-sple-red/20 hover:bg-sple-red/90 transition-all active:scale-95 duration-200">
                   <span className="material-symbols-outlined fill">near_me</span> 길찾기
                 </a>
               </div>
@@ -533,8 +526,8 @@ export default function Home() {
       <AnimatePresence>
         {isModalOpen && (
           <>
-            <div className="fixed inset-0 bg-overlay-dim z-[200] backdrop-blur-sm transition-opacity" onClick={() => { setIsModalOpen(false); setAnalyzedPlaces([]); }} />
-            <div className="fixed inset-x-0 bottom-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 z-[210] w-full sm:w-[90%] sm:max-w-md bg-glass-bg backdrop-blur-xl border border-outline-variant/30 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="fixed inset-0 bg-overlay-dim z-200 backdrop-blur-sm transition-opacity" onClick={() => { setIsModalOpen(false); setAnalyzedPlaces([]); }} />
+            <div className="fixed inset-x-0 bottom-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 z-210 w-full sm:w-[90%] sm:max-w-md bg-glass-bg backdrop-blur-xl border border-outline-variant/30 rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[90vh]">
               <div className="px-6 pt-6 pb-4 flex justify-between items-center border-b border-outline-variant/20 shrink-0">
                 <h2 className="font-headline-md text-headline-md text-on-surface">장소 분석</h2>
                 <button onClick={() => { setIsModalOpen(false); setAnalyzedPlaces([]); }} className="p-2 rounded-full hover:bg-surface-variant/40 transition-colors text-on-surface-variant">
@@ -553,10 +546,11 @@ export default function Home() {
                 ) : !analyzedPlaces.length ? (
                   <>
                     <div className="flex flex-col gap-stack-sm">
-                      <label className="font-label-sm text-label-sm text-on-surface-variant">인스타그램 링크</label>
+                      <label htmlFor="url-input" className="font-label-sm text-label-sm text-on-surface-variant">인스타그램 링크</label>
                       <div className="relative flex items-center">
                         <span className="material-symbols-outlined absolute left-4 text-on-surface-variant">link</span>
                         <input
+                          id="url-input"
                           className="w-full bg-surface-container-highest/50 border border-outline-variant/50 rounded-xl py-4 pl-12 pr-12 font-body-md text-body-md text-on-surface focus:outline-none focus:border-sple-red focus:ring-1 focus:ring-sple-red transition-all"
                           placeholder="https://instagram.com/p/..."
                           value={urlInput}
@@ -628,7 +622,9 @@ export default function Home() {
                             >
                               <div className="flex items-center bg-surface-container-highest/50 rounded-lg px-3 py-2 border border-outline-variant/30">
                                 <span className="material-symbols-outlined text-[16px] text-on-surface-variant mr-2">folder</span>
+                                <label htmlFor={`folder-input-${i}`} className="sr-only">폴더 지정</label>
                                 <input
+                                  id={`folder-input-${i}`}
                                   placeholder="폴더 (예: 성수 데이트)"
                                   className="bg-transparent border-none outline-none font-label-sm text-label-sm text-on-surface w-full"
                                   value={folderInputs[i] || ""}
@@ -637,7 +633,9 @@ export default function Home() {
                               </div>
                               <div className="flex items-start bg-surface-container-highest/50 rounded-lg px-3 py-2 border border-outline-variant/30">
                                 <span className="material-symbols-outlined text-[16px] text-on-surface-variant mr-2 mt-0.5">edit_note</span>
+                                <label htmlFor={`memo-input-${i}`} className="sr-only">메모 작성</label>
                                 <textarea
+                                  id={`memo-input-${i}`}
                                   placeholder="개인 메모"
                                   className="bg-transparent border-none outline-none font-label-sm text-label-sm text-on-surface w-full resize-none h-16"
                                   value={memoInputs[i] || ""}

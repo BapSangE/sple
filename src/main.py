@@ -20,6 +20,7 @@ from sqlalchemy import or_
 
 from database import init_db, get_db, Place
 import auth
+from pathlib import Path
 
 # .env 파일 로드
 load_dotenv()
@@ -35,7 +36,8 @@ IG_PAGE_ACCESS_TOKEN = os.getenv("IG_PAGE_ACCESS_TOKEN")
 # 배포 도메인으로 업데이트
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://sple-insta.com")
 
-GCP_SA_KEY_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+# GCP 인증 설정 (환경 변수 우선, 없으면 기본 파일명 확인)
+GCP_SA_KEY_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "insta-place-gcp.json")
 GCP_SA_KEY_JSON = os.getenv("GCP_SA_KEY_JSON")
 GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "insta-place-493505")
 GCP_LOCATION = os.getenv("GCP_LOCATION", "us-central1")
@@ -54,6 +56,34 @@ if not GCP_SA_KEY_PATH and GCP_SA_KEY_JSON:
     except Exception as e:
         logger.error(f"Failed to create temporary GCP key file: {e}")
 
+# Gemini/Vertex AI 클라이언트 초기화
+client = None
+if GCP_SA_KEY_PATH:
+    # 상대 경로인 경우 절대 경로로 변환 (루트 디렉토리 기준)
+    if not os.path.isabs(GCP_SA_KEY_PATH):
+        root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        possible_path = os.path.join(root_dir, GCP_SA_KEY_PATH)
+        if os.path.exists(possible_path):
+            GCP_SA_KEY_PATH = possible_path
+    
+    if os.path.exists(GCP_SA_KEY_PATH):
+        logger.info(f"Using Vertex AI with GCP Service Account: {GCP_SA_KEY_PATH}")
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GCP_SA_KEY_PATH
+        client = genai.Client(
+            vertexai=True,
+            project=GCP_PROJECT_ID,
+            location=GCP_LOCATION
+        )
+    else:
+        logger.warning(f"GCP SA Key file not found at: {GCP_SA_KEY_PATH}")
+
+if not client and GEMINI_API_KEY:
+    logger.info("Using Gemini API Key (Fallback)")
+    client = genai.Client(api_key=GEMINI_API_KEY)
+
+if not client:
+    logger.warning("Gemini 인증 정보(GCP JSON 또는 API_KEY)가 설정되지 않았습니다.")
+
 JWT_SECRET = os.getenv("NEXTAUTH_SECRET", os.getenv("JWT_SECRET", "super-secret-key-change-me-later"))
 ALGORITHM = "HS256"
 
@@ -70,20 +100,6 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     except Exception as e:
         logger.warning(f"get_current_user: JWT Decode Error - {e}")
         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
-
-client = None
-if GCP_SA_KEY_PATH and os.path.exists(GCP_SA_KEY_PATH):
-    logger.info(f"Using GCP Service Account from {GCP_SA_KEY_PATH}")
-    client = genai.Client(
-        vertexai=True,
-        project=GCP_PROJECT_ID,
-        location=GCP_LOCATION
-    )
-elif GEMINI_API_KEY:
-    logger.info("Using Gemini API Key")
-    client = genai.Client(api_key=GEMINI_API_KEY)
-else:
-    logger.warning("Gemini 인증 정보(API_KEY 또는 GCP JSON)가 설정되지 않았습니다.")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

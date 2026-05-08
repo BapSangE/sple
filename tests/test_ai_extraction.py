@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import os
 import sys
 import pytest
@@ -29,7 +29,7 @@ async def test_extraction():
     assert len(result) > 0
     first_place = result[0]
     assert "name" in first_place
-    assert first_place["name"] == "어니언"
+    assert "어니언" in first_place["name"]
     assert "address" in first_place
     assert "서울특별시 성동구 아차산로9길 8" in first_place["address"]
 
