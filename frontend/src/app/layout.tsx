@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
-import { Providers } from "@/components/Providers";
 
 const plusJakarta = Plus_Jakarta_Sans({ 
   subsets: ["latin"], 
@@ -10,8 +9,8 @@ const plusJakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Sple - The Fluid Cartographer",
-  description: "인스타그램 맛집 정보를 지도 하나에 유연하게 담다",
+  title: "Sple - 인스타 링크로 바로 찾기",
+  description: "인스타그램 맛집 정보를 네이버 지도로 즉시 연결",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -56,7 +55,7 @@ export default function RootLayout({
             `,
           }}
         />
-        <Providers>{children}</Providers>
+        {children}
       </body>
     </html>
   );
