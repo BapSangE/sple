@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
 @theme {
+  --font-sans: var(--font-pretendard);
+
   /* Brand Colors */
   --color-sple-red: #FF6B6B;
   --color-smart-purple: #6B4EFF;

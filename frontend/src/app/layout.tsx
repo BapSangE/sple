@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const plusJakarta = Plus_Jakarta_Sans({ 
-  subsets: ["latin"], 
-  variable: "--font-plus-jakarta",
-  weight: ["400", "500", "600", "700", "800"]
+const pretendard = localFont({
+  src: "../../public/fonts/PretendardVariable.woff2",
+  variable: "--font-pretendard",
+  display: "swap",
+  weight: "45 920",
 });
 
 export const metadata: Metadata = {
@@ -39,7 +40,7 @@ export default function RootLayout({
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" />
       </head>
-      <body className={`${plusJakarta.variable} font-body-md antialiased h-screen flex flex-col bg-background text-on-surface`}>
+      <body className={`${pretendard.variable} font-sans antialiased h-screen flex flex-col bg-background text-on-surface`}>
         <script
           dangerouslySetInnerHTML={{
             __html: `
