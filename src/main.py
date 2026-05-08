@@ -55,10 +55,18 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Sple Reboot API", lifespan=lifespan)
 
-# CORS 설정 (Reboot: 내부 API 호출만 허용)
+# CORS 설정 (운영 도메인 및 로컬 환경 허용)
+allowed_origins = [
+    "https://sple-insta.com",
+    "https://www.sple-insta.com",
+    "http://sple-insta.com",
+    "http://www.sple-insta.com",
+    "http://localhost:3000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
