@@ -12,12 +12,13 @@ export default function Home() {
   const [url, setUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [places, setPlaces] = useState<Place[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
+  const [errorTitle, setErrorTitle] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
   const handleExtract = async () => {
     if (!url.trim()) return;
     setIsLoading(true);
-    setError(null);
     setPlaces([]);
 
     try {
@@ -31,10 +32,15 @@ export default function Home() {
       if (data.status === "success" && data.data && data.data.length > 0) {
         setPlaces(data.data);
       } else {
-        setError("장소 정보를 추출하지 못했습니다. 다른 링크를 시도해 주세요.");
+        // 장소가 아닐 경우 팝업 트리거
+        setErrorTitle("장소를 찾을 수 없어요 😢");
+        setErrorMessage("해당 게시물에서 방문 가능한 장소 정보를 찾지 못했습니다. 장소 정보가 포함된 다른 링크로 시도해 주세요.");
+        setIsErrorModalOpen(true);
       }
     } catch {
-      setError("서버 연결에 실패했습니다.");
+      setErrorTitle("연결 오류");
+      setErrorMessage("서버와 통신하는 중 문제가 발생했습니다. 네트워크 상태를 확인해 주세요.");
+      setIsErrorModalOpen(true);
     } finally {
       setIsLoading(false);
     }
@@ -46,7 +52,7 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-[#1c1010] text-[#f5dddb] font-sans flex flex-col items-center justify-center p-6">
+    <main className="min-h-screen bg-[#1c1010] text-[#f5dddb] font-sans flex flex-col items-center justify-center p-6 relative">
       <div className="w-full max-w-md flex flex-col gap-8">
         {/* Header */}
         <div className="text-center space-y-2">
@@ -90,17 +96,6 @@ export default function Home() {
               </motion.div>
             )}
 
-            {error && !isLoading && (
-              <motion.div
-                key="error"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="p-4 bg-red-900/30 border border-red-500/50 rounded-xl text-center text-red-200"
-              >
-                {error}
-              </motion.div>
-            )}
-
             {!isLoading && places.length > 0 && (
               <motion.div
                 key="results"
@@ -133,6 +128,38 @@ export default function Home() {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* Error Modal Popup */}
+      <AnimatePresence>
+        {isErrorModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsErrorModalOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm bg-[#291c1c] border border-[#584140] rounded-3xl p-8 shadow-2xl flex flex-col gap-6 text-center"
+            >
+              <div className="space-y-2">
+                <h3 className="text-2xl font-bold text-white">{errorTitle}</h3>
+                <p className="text-[#e0bfbd] text-sm leading-relaxed">{errorMessage}</p>
+              </div>
+              <button
+                onClick={() => setIsErrorModalOpen(false)}
+                className="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl transition-all"
+              >
+                확인
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

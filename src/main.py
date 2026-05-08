@@ -70,27 +70,48 @@ class PlaceRequest(BaseModel):
 
 # --- Utility Functions ---
 async def get_instagram_metadata(url: str):
+    """인스타그램 메타데이터를 여러 방법으로 시도하여 가져옵니다."""
     clean_url = url.split('?')[0]
-    headers = {"User-Agent": "Mozilla/5.0"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    }
+    
     try:
         async with httpx.AsyncClient() as client_http:
+            # 방법 1: Jina Reader (성능은 좋으나 차단 가능성 있음)
             reader_url = f"https://r.jina.ai/{clean_url}"
-            response = await client_http.get(reader_url, headers=headers, timeout=10.0)
-            if response.status_code == 200 and len(response.text) > 200:
+            response = await client_http.get(reader_url, headers=headers, timeout=8.0)
+            if response.status_code == 200 and len(response.text) > 100 and "securitycompromise" not in response.text.lower():
                 return {"raw_text": response.text}
+            
+            # 방법 2: 직접 OpenGraph 메타 태그 추출 (차단 방어용)
+            res = await client_http.get(clean_url, headers=headers, follow_redirects=True, timeout=8.0)
+            if res.status_code == 200:
+                soup = BeautifulSoup(res.text, 'html.parser')
+                og_desc = soup.find("meta", property="og:description")
+                og_title = soup.find("meta", property="og:title")
+                combined = f"{og_title['content'] if og_title else ''} {og_desc['content'] if og_desc else ''}".strip()
+                if combined:
+                    return {"raw_text": combined}
     except Exception as e:
         logger.error(f"Metadata extraction error: {e}")
     return None
 
 async def extract_place_info(text: str):
     if not client or not text: return None
+    # 프롬프트 강화: 장소가 아닐 경우 빈 리스트 반환 지시 추가
     prompt = f"""
-    당신은 한국의 장소 정보를 추출하는 AI입니다. 
-    텍스트에서 실제 방문 가능한 장소명과 주소를 찾아 JSON 배열 형태로 추출하세요.
-    오직 JSON만 출력하세요. 불필요한 부연 설명은 생략합니다.
+    당신은 한국의 핫플레이스 정보를 전문적으로 추출하는 AI입니다. 
+    제공된 인스타그램 텍스트에서 '실제 방문 가능한 특정 장소(식당, 카페, 문화공간 등)'가 언급되었는지 판단하세요.
 
-    [형식]
-    [ {{"name": "상호명", "address": "도로명주소"}} ]
+    [핵심 규칙]
+    1. **장소 여부 판단:** 방문 가능한 구체적인 상호명이 없다면(예: 단순 일상 글, 셀카, 풍경 등) 아무것도 추출하지 말고 빈 배열 `[]`만 반환하세요.
+    2. **상호명 우선:** 장소가 맞다면, 상세 주소가 없더라도 '성수동 어니언'처럼 지역명과 상호명을 결합하여 실제 도로명/지번 주소를 유추하여 기입하세요.
+    3. **오직 JSON만:** 설명 없이 오직 JSON 배열만 출력하세요.
+
+    [응답 형식]
+    - 장소가 맞을 때: [ {{"name": "상호명", "address": "주소"}} ]
+    - 장소가 아닐 때: []
 
     텍스트:
     \"\"\"{text}\"\"\"
