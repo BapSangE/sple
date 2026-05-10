@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import Animated, { withSpring, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+import AdMobBanner from '../components/AdMobBanner';
 
 // 현재 WebView와 API 호출에 사용할 백엔드 주소 (환경변수로 분리)
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://172.16.30.59:8000';
@@ -149,6 +150,11 @@ export default function MainMapScreen() {
       >
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
+
+      {/* 광고 배너 (바텀 시트 바로 위 배치) */}
+      <View style={styles.adContainer}>
+        <AdMobBanner />
+      </View>
 
       {/* 바텀 시트 영역 (간편 예시) */}
       <View style={styles.bottomSheet}>
@@ -293,6 +299,12 @@ const styles = StyleSheet.create({
     fontSize: 32,
     color: '#FFF',
     lineHeight: 34,
+  },
+  adContainer: {
+    position: 'absolute',
+    bottom: 100, // 바텀 시트(높이 100) 바로 위에 배치
+    width: '100%',
+    zIndex: 5,
   },
   bottomSheet: {
     position: 'absolute',
