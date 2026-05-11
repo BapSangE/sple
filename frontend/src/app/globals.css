@@ -4,89 +4,33 @@
   --font-sans: var(--font-pretendard);
 
   /* Brand Colors */
-  --color-sple-red: #FF6B6B;
-  --color-smart-purple: #6B4EFF;
-  --color-guide-mint: #00D09E;
+  --color-primary: #FF8746;
+  --color-secondary: #FF6B1B;
+  --color-success: #006C50;
+
+  /* Nav Background */
+  --color-nav-bg: #2B2B2B;
 
   /* Surface & Background */
-  --color-background: #1c1010;
-  --color-surface: #1c1010;
-  --color-surface-container-lowest: #160b0b;
-  --color-surface-container-low: #251818;
-  --color-surface-container: #291c1c;
-  --color-surface-container-high: #352726;
-  --color-surface-container-highest: #403130;
-  --color-glass-bg: rgba(15, 23, 42, 0.8);
-  --color-overlay-dim: rgba(0, 0, 0, 0.4);
+  --color-background: #F6F3F2;
+  --color-surface: #FFFFFF;
+  --color-sheet: rgba(255, 255, 255, 0.9);
 
-  --color-primary: #ffb3b0;
-  --color-on-primary: #68000f;
-  --color-primary-container: #ff6b6b;
-  --color-on-primary-container: #6d0010;
-  
-  --color-on-surface: #f5dddb;
-  --color-on-surface-variant: #e0bfbd;
-  --color-outline: #a78a88;
-  --color-outline-variant: #584140;
-
-  /* Fonts */
-  --font-title-sm: "Plus Jakarta Sans", sans-serif;
-  --font-headline-md: "Plus Jakarta Sans", sans-serif;
-  --font-display-lg: "Plus Jakarta Sans", sans-serif;
-  --font-label-sm: "Plus Jakarta Sans", sans-serif;
-  --font-body-md: "Plus Jakarta Sans", sans-serif;
-
-  /* Font Sizes */
-  --text-display-lg: 32px;
-  --text-display-lg--line-height: 1.2;
-  --text-display-lg--font-weight: 700;
-
-  --text-headline-md: 24px;
-  --text-headline-md--line-height: 1.3;
-  --text-headline-md--font-weight: 600;
-
-  --text-title-sm: 18px;
-  --text-title-sm--line-height: 1.4;
-  --text-title-sm--font-weight: 600;
-
-  --text-body-md: 16px;
-  --text-body-md--line-height: 1.6;
-  --text-body-md--font-weight: 400;
-
-  --text-label-sm: 13px;
-  --text-label-sm--line-height: 1.2;
-  --text-label-sm--letter-spacing: 0.02em;
-  --text-label-sm--font-weight: 500;
+  /* Text Colors */
+  --color-text-primary: #1B1B1C;
+  --color-text-secondary: #A1A1AA;
 
   /* Spacing */
-  --spacing-stack-sm: 8px;
-  --spacing-gutter: 12px;
-  --spacing-stack-md: 16px;
-  --spacing-safe-margin: 20px;
-  --spacing-stack-lg: 24px;
-
-  /* Radius */
-  --radius-sm: 0.25rem;
-  --radius-DEFAULT: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
-  --radius-xl: 1.5rem;
-  --radius-2xl: 1rem;
-  --radius-3xl: 1.5rem;
-  --radius-full: 9999px;
-}
-
-:root {
-  --font-plus-jakarta: "Plus Jakarta Sans", sans-serif;
+  --spacing-safe-margin: 24px;
 }
 
 body {
   background-color: var(--color-background);
-  color: var(--color-on-surface);
-  font-family: var(--font-plus-jakarta);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
   margin: 0;
   padding: 0;
-  overflow: hidden;
+  overflow: hidden; /* App-like feel */
   -webkit-font-smoothing: antialiased;
 }
 
@@ -95,17 +39,6 @@ body {
   &::-webkit-scrollbar { display: none; }
   -ms-overflow-style: none;
   scrollbar-width: none;
-}
-
-@utility shimmer {
-  background: linear-gradient(to right, var(--color-surface-container-high) 8%, var(--color-surface-container-highest) 18%, var(--color-surface-container-high) 33%);
-  background-size: 1000px 100%;
-  animation: shimmer-anim 2.5s infinite linear forwards;
-}
-
-@keyframes shimmer-anim {
-  0% { background-position: -1000px 0; }
-  100% { background-position: 1000px 0; }
 }
 
 /* Material Symbols Adjustments */

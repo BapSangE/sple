@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import Script from "next/script";
+import TopAppBar from "@/components/layout/TopAppBar";
+import BottomNavBar from "@/components/layout/BottomNavBar";
 import "./globals.css";
 
 const pretendard = localFont({
@@ -22,7 +24,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
-  themeColor: "#1c1010",
+  themeColor: "#F6F3F2",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -43,7 +45,7 @@ export default function RootLayout({
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" />
       </head>
-      <body className={`${pretendard.variable} font-sans antialiased h-screen flex flex-col bg-white text-gray-900`}>
+      <body className={`${pretendard.variable} font-sans antialiased h-screen flex flex-col bg-background text-text-primary overflow-hidden`}>
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -59,7 +61,17 @@ export default function RootLayout({
             `,
           }}
         />
-        {children}
+        {/* Naver Map API Load */}
+        <Script
+          strategy="beforeInteractive"
+          src={`https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${process.env.NEXT_PUBLIC_NAVER_CLIENT_ID}`}
+        />
+        
+        <TopAppBar />
+        <main className="flex-1 relative w-full h-full">
+          {children}
+        </main>
+        <BottomNavBar />
       </body>
     </html>
   );
