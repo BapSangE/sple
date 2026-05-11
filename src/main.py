@@ -12,6 +12,10 @@ from google import genai
 import json
 import re
 from pathlib import Path
+from typing import List, Optional
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from database import get_db, init_db, Place as DBPlace
 
 # .env 파일 로드
 load_dotenv()
@@ -51,7 +55,9 @@ if not client:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await init_db()
     yield
+
 
 app = FastAPI(title="Sple Reboot API", lifespan=lifespan)
 
@@ -75,6 +81,14 @@ app.add_middleware(
 # --- Pydantic Models ---
 class PlaceRequest(BaseModel):
     url: str
+
+class PlaceItem(BaseModel):
+    user_id: str
+    name: str
+    address: str
+    category: str = "All"
+    rating: Optional[float] = None
+    summary: Optional[str] = None
 
 # --- Utility Functions ---
 async def get_instagram_metadata(url: str):
@@ -156,6 +170,20 @@ async def analyze_place_api(request: PlaceRequest):
     
     extracted_data = await extract_place_info(text_for_ai)
     return JSONResponse(content={"status": "success", "data": extracted_data})
+
+@app.post("/api/places")
+async def save_place(place: PlaceItem, db: AsyncSession = Depends(get_db)):
+    db_place = DBPlace(**place.model_dump())
+    db.add(db_place)
+    await db.commit()
+    await db.refresh(db_place)
+    return {"status": "success", "data": {"id": db_place.id, **place.model_dump()}}
+
+@app.get("/api/places")
+async def get_places(user_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(DBPlace).where(DBPlace.user_id == user_id))
+    places = result.scalars().all()
+    return {"status": "success", "data": [{"id": p.id, "name": p.name, "address": p.address, "category": p.category, "rating": p.rating, "summary": p.summary} for p in places]}
 
 @app.get("/api/webhook/instagram")
 async def verify_webhook(request: Request):

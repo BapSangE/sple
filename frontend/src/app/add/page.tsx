@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, X } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 // TODO: 타입 정의는 분리하는 것이 좋습니다.
 interface Place {
@@ -13,6 +14,7 @@ interface Place {
 }
 
 export default function AddPage() {
+  const { data: session } = useSession();
   const [url, setUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [places, setPlaces] = useState<Place[]>([]);
@@ -58,16 +60,43 @@ export default function AddPage() {
     setPlaces(newPlaces);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const selectedPlaces = places.filter(p => p.selected);
     if (selectedPlaces.length === 0) {
       alert("최소 한 개의 장소를 선택해주세요.");
       return;
     }
-    
-    // TODO: 서버에 저장 요청
-    alert(`${selectedPlaces.length}개의 장소가 저장되었습니다!`);
-    router.push("/saved"); // 리스트 화면으로 이동
+
+    if (!session?.user || !(session.user as any).id) {
+      alert("로그인이 필요합니다. 프로필 탭에서 로그인해주세요.");
+      return;
+    }
+
+    const userId = (session.user as any).id;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+
+    try {
+      // 선택된 장소들을 각각 서버에 저장
+      await Promise.all(
+        selectedPlaces.map(place => 
+          fetch(`${apiUrl}/api/places`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              user_id: userId,
+              name: place.name,
+              address: place.address,
+            }),
+          })
+        )
+      );
+
+      alert(`${selectedPlaces.length}개의 장소가 저장되었습니다!`);
+      router.push("/saved"); // 리스트 화면으로 이동
+    } catch (error) {
+      console.error("저장 중 오류 발생:", error);
+      alert("장소 저장에 실패했습니다.");
+    }
   };
 
   return (

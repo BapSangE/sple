@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, MapPin, X } from "lucide-react";
 
@@ -13,13 +14,47 @@ interface SavedPlace {
   summary: string;
 }
 
-const DUMMY_PLACES: SavedPlace[] = [
-  { id: 1, name: "히포 브런치하우스", address: "서울 마포구 성미산로17길 85 1층", category: "Cafe", rating: 4.8, summary: "다양한 메뉴가 있는 브런치 천국" },
-  { id: 2, name: "블루보틀 연남", address: "서울 마포구 성미산로 123", category: "Cafe", rating: 4.5, summary: "산미 있는 커피가 매력적인 공간" },
-];
+const CATEGORIES = ['All', 'Cafe', 'Dining', 'Bar'];
 
 export default function SavedPage() {
+  const { data: session, status } = useSession();
+  const [places, setPlaces] = useState<SavedPlace[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
   const [selectedPlace, setSelectedPlace] = useState<SavedPlace | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+
+  useEffect(() => {
+    if (status === "loading") return;
+
+    if (session?.user && (session.user as any).id) {
+      const userId = (session.user as any).id;
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+      
+      fetch(`${apiUrl}/api/places?user_id=${userId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.status === "success") {
+            setPlaces(data.data);
+          }
+        })
+        .catch((error) => console.error("Failed to fetch places:", error))
+        .finally(() => setIsLoading(false));
+    } else {
+      setPlaces([]);
+      setIsLoading(false);
+    }
+  }, [session, status]);
+
+  const filteredPlaces = useMemo(() => {
+    return places.filter((place) => {
+      const matchesCategory = selectedCategory === "All" || place.category === selectedCategory;
+      const matchesSearch = place.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            place.address.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesCategory && matchesSearch;
+    });
+  }, [places, searchQuery, selectedCategory]);
 
   const handleNaverMap = (place: SavedPlace) => {
     const query = encodeURIComponent(`${place.address} ${place.name}`);
@@ -37,38 +72,66 @@ export default function SavedPage() {
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
         <input 
           type="text" 
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="장소 검색..." 
           className="w-full h-12 pl-12 pr-4 rounded-xl border border-gray-200 bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
         />
       </div>
 
       <div className="flex gap-2 overflow-x-auto hide-scrollbar mb-6">
-        {['All', 'Cafe', 'Dining', 'Bar'].map((cat) => (
-          <button key={cat} className="px-4 py-1.5 rounded-full bg-white border border-gray-200 text-sm font-medium whitespace-nowrap active:scale-95 transition-transform">
+        {CATEGORIES.map((cat) => (
+          <button 
+            key={cat} 
+            onClick={() => setSelectedCategory(cat)}
+            className={`px-4 py-1.5 rounded-full border text-sm font-medium whitespace-nowrap active:scale-95 transition-all ${
+              selectedCategory === cat 
+                ? "bg-primary text-white border-primary shadow-sm" 
+                : "bg-white border-gray-200 text-text-secondary hover:bg-gray-50"
+            }`}
+          >
             {cat}
           </button>
         ))}
       </div>
 
       <div className="flex-1 overflow-y-auto hide-scrollbar flex flex-col gap-4 pb-6">
-        {DUMMY_PLACES.map((place) => (
-          <div 
-            key={place.id} 
-            onClick={() => setSelectedPlace(place)}
-            className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 cursor-pointer active:scale-[0.98] transition-all"
-          >
-            <div className="flex justify-between items-start mb-2">
-              <h3 className="font-bold text-lg text-text-primary">{place.name}</h3>
-              <div className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded-md text-xs font-bold">
-                <span className="material-symbols-outlined fill text-[12px]">star</span>
-                {place.rating}
-              </div>
-            </div>
-            <p className="text-text-secondary text-sm flex items-center gap-1">
-              <MapPin size={14} /> {place.address}
-            </p>
+        {status === "unauthenticated" ? (
+           <div className="flex flex-col items-center justify-center py-10 text-gray-400 text-center">
+             <span className="material-symbols-outlined text-4xl mb-2">lock</span>
+             <p>로그인 후 장소를 저장하고 확인할 수 있습니다.</p>
+           </div>
+        ) : isLoading ? (
+          <div className="flex justify-center py-10">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
           </div>
-        ))}
+        ) : filteredPlaces.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+            <span className="material-symbols-outlined text-4xl mb-2">search_off</span>
+            <p>저장된 장소가 없거나 검색 결과가 없습니다.</p>
+          </div>
+        ) : (
+          filteredPlaces.map((place) => (
+            <div 
+              key={place.id} 
+              onClick={() => setSelectedPlace(place)}
+              className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 cursor-pointer active:scale-[0.98] transition-all"
+            >
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-bold text-lg text-text-primary">{place.name}</h3>
+                {place.rating && (
+                  <div className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded-md text-xs font-bold">
+                    <span className="material-symbols-outlined fill text-[12px]">star</span>
+                    {place.rating}
+                  </div>
+                )}
+              </div>
+              <p className="text-text-secondary text-sm flex items-center gap-1">
+                <MapPin size={14} /> {place.address}
+              </p>
+            </div>
+          ))
+        )}
       </div>
 
       {/* 상세 바텀 시트 */}
@@ -103,15 +166,17 @@ export default function SavedPage() {
                 </button>
               </div>
 
-              <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 mb-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="material-symbols-outlined fill text-primary">psychiatry</span>
-                  <span className="font-bold text-primary text-sm">AI 요약</span>
+              {selectedPlace.summary && (
+                <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 mb-6">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="material-symbols-outlined fill text-primary">psychiatry</span>
+                    <span className="font-bold text-primary text-sm">AI 요약</span>
+                  </div>
+                  <p className="text-text-primary text-sm leading-relaxed">
+                    {selectedPlace.summary}
+                  </p>
                 </div>
-                <p className="text-text-primary text-sm leading-relaxed">
-                  {selectedPlace.summary}
-                </p>
-              </div>
+              )}
 
               <button 
                 onClick={() => handleNaverMap(selectedPlace)}

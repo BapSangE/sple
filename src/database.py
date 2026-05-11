@@ -1,10 +1,11 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.orm import declarative_base, Mapped, mapped_column
+from sqlalchemy import Integer, String, Float, Text
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Reboot: 서버에 데이터를 저장하지 않으므로 최소한의 엔진 설정만 유지 (향후 로그용 확장성 대비)
 DATABASE_URL = os.getenv("DATABASE_URL")
 if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
@@ -16,13 +17,26 @@ if not DATABASE_URL:
 engine = create_async_engine(
     DATABASE_URL, 
     echo=False,
-    connect_args={"statement_cache_size": 0} 
+    connect_args={"statement_cache_size": 0} if "postgresql" in DATABASE_URL else {}
 )
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
+Base = declarative_base()
+
+class Place(Base):
+    __tablename__ = "places"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[str] = mapped_column(String, index=True) # Google Auth user ID
+    name: Mapped[str] = mapped_column(String)
+    address: Mapped[str] = mapped_column(String)
+    category: Mapped[str] = mapped_column(String, default="All")
+    rating: Mapped[float] = mapped_column(Float, nullable=True)
+    summary: Mapped[str] = mapped_column(Text, nullable=True)
+
 async def init_db():
-    # 현재는 테이블이 없으므로 통과
-    pass
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 async def get_db():
     async with async_session() as session:
