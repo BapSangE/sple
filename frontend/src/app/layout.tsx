@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import localFont from "next/font/local";
+import Script from "next/script";
 import "./globals.css";
-import { Providers } from "@/components/Providers";
 
-const plusJakarta = Plus_Jakarta_Sans({ 
-  subsets: ["latin"], 
-  variable: "--font-plus-jakarta",
-  weight: ["400", "500", "600", "700", "800"]
+const pretendard = localFont({
+  src: "../../public/fonts/PretendardVariable.woff2",
+  variable: "--font-pretendard",
+  display: "swap",
+  weight: "45 920",
 });
 
 export const metadata: Metadata = {
-  title: "Sple - The Fluid Cartographer",
-  description: "인스타그램 맛집 정보를 지도 하나에 유연하게 담다",
+  title: "Sple - 인스타 링크로 바로 찾기",
+  description: "인스타그램 맛집 정보를 네이버 지도로 즉시 연결",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -35,12 +36,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" className="dark">
+    <html lang="ko">
       <head>
+        {/* 구글 애드센스 소유권 확인 및 스크립트 로드 */}
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3515900005800180" crossOrigin="anonymous"></script>
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" />
       </head>
-      <body className={`${plusJakarta.variable} font-body-md antialiased h-screen flex flex-col bg-background text-on-surface`}>
+      <body className={`${pretendard.variable} font-sans antialiased h-screen flex flex-col bg-white text-gray-900`}>
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -56,7 +59,7 @@ export default function RootLayout({
             `,
           }}
         />
-        <Providers>{children}</Providers>
+        {children}
       </body>
     </html>
   );
