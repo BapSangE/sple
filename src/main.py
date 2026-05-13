@@ -61,19 +61,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Sple Reboot API", lifespan=lifespan)
 
-# CORS 설정 (운영 도메인 및 로컬 환경 허용)
-allowed_origins = [
-    "https://sple-insta.com",
-    "https://www.sple-insta.com",
-    "http://sple-insta.com",
-    "http://www.sple-insta.com",
-    "http://localhost:3000",
-]
-
+# CORS 설정 강화 (AWS 배포 환경 최적화)
+# Vercel과 AWS 간의 통신 문제를 해결하기 위해 일시적으로 모든 origin 허용
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -137,7 +130,7 @@ async def extract_place_info(text: str):
     \"\"\"{text}\"\"\"
     """
     try:
-        # 모델 명칭 원복: gemini-2.5-flash
+        # 모델 명칭: gemini-2.5-flash
         response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
         json_match = re.search(r'\[.*\]', response.text, re.DOTALL)
         if json_match: return json.loads(json_match.group())
