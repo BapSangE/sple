@@ -92,21 +92,21 @@ class PlaceItem(BaseModel):
 
 # --- Utility Functions ---
 async def get_instagram_metadata(url: str):
-    """인스타그램 메타데이터를 여러 방법으로 시도하여 가져옵니다."""
+    """인스타그램 메타데이터를 추출합니다."""      
     clean_url = url.split('?')[0]
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     }
-    
+
     try:
         async with httpx.AsyncClient() as client_http:
-            # 방법 1: Jina Reader (성능은 좋으나 차단 가능성 있음)
+            # 방법 1: Jina Reader
             reader_url = f"https://r.jina.ai/{clean_url}"
             response = await client_http.get(reader_url, headers=headers, timeout=20.0)
             if response.status_code == 200 and len(response.text) > 100 and "securitycompromise" not in response.text.lower():
                 return {"raw_text": response.text}
-            
-            # 방법 2: 직접 OpenGraph 메타 태그 추출 (차단 방어용)
+
+            # 방법 2: OpenGraph 메타 태그
             res = await client_http.get(clean_url, headers=headers, follow_redirects=True, timeout=20.0)
             if res.status_code == 200:
                 soup = BeautifulSoup(res.text, 'html.parser')
@@ -121,31 +121,28 @@ async def get_instagram_metadata(url: str):
 
 async def extract_place_info(text: str):
     if not client or not text: return None
-    # 프롬프트 강화: 장소가 아닐 경우 빈 리스트 반환 지시 추가
+    
     prompt = f"""
     당신은 한국의 핫플레이스 정보를 전문적으로 추출하는 AI입니다. 
-    제공된 인스타그램 텍스트에서 '실제 방문 가능한 특정 장소(식당, 카페, 문화공간 등)'가 언급되었는지 파악하세요.
+    제공된 텍스트(인스타그램 게시글 등)에서 '실제 방문 가능한 특정 장소(식당, 카페, 술집, 문화공간 등)'를 찾아내세요.
 
     [핵심 규칙]
-    1. **장소 여부 판단:** 방문 가능한 구체적인 상호명이 없다면 아무것도 추출하지 말고 빈 배열 `[]`만 반환하세요.
-    2. **단편적 정보 유추 (중요):** 텍스트가 중간에 잘려있거나 상세 주소가 없더라도, 해시태그(#미가쌀국수안산중앙점)나 짧은 지역명(예: 고잔동)이 보이면 이를 결합하여 상호명과 실제 도로명/지번 주소를 적극적으로 유추하세요.
-    3. **다중 장소 추출:** 텍스트에 여러 장소가 소개되어 있다면, 파악 가능한 모든 장소를 찾아 배열에 담아주세요.
-    4. **오직 JSON만:** 설명 없이 오직 JSON 배열만 출력하세요.
-
-    [응답 형식]
-    - 장소가 1개일 때: [ {{"name": "상호명", "address": "주소"}} ]
-    - 장소가 여러 개일 때: [ {{"name": "상호명1", "address": "주소1"}}, {{"name": "상호명2", "address": "주소2"}} ]
-    - 장소가 아닐 때: []
+    1. **상호명 추출:** 이모지나 불필요한 수식어는 제외하고 실제 검색 가능한 상호명만 추출하세요. (예: "🔥43번지 혼술바🔥" -> "43번지 혼술바")
+    2. **주소 추출:** 텍스트에 포함된 도로명 주소나 지번 주소를 정확히 추출하세요. 주소가 불완전하더라도 지역명(예: 안산 중앙동)이 있다면 포함하세요.
+    3. **데이터 유추:** 상호명은 있지만 주소가 명확하지 않은 경우, 텍스트 내의 지역 힌트를 조합하여 가장 유력한 주소를 응답하세요.
+    4. **다중 장소:** 여러 장소가 있다면 모두 배열에 담으세요.
+    5. **응답 형식:** 오직 JSON 배열만 출력하세요. 장소를 찾을 수 없으면 `[]`를 반환하세요.
 
     텍스트:
     \"\"\"{text}\"\"\"
     """
     try:
+        # 모델 명칭 원복: gemini-2.5-flash
         response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
         json_match = re.search(r'\[.*\]', response.text, re.DOTALL)
         if json_match: return json.loads(json_match.group())
     except Exception as e:
-        logger.error(f"Gemini 2.5 Flash Error: {e}")
+        logger.error(f"Gemini API Error: {e}")
     return None
 
 async def send_ig_reply(recipient_id: str, message_text: str):
@@ -163,13 +160,19 @@ async def read_root():
 @app.post("/api/analyze")
 async def analyze_place_api(request: PlaceRequest):
     raw_content = request.url.strip()
-    text_for_ai = raw_content
+
     if raw_content.startswith("http"):
         metadata = await get_instagram_metadata(raw_content)
         text_for_ai = metadata["raw_text"] if metadata else raw_content
-    
+    else:
+        text_for_ai = raw_content
+
     extracted_data = await extract_place_info(text_for_ai)
-    return JSONResponse(content={"status": "success", "data": extracted_data})
+
+    if not extracted_data and raw_content.startswith("http"):
+        extracted_data = await extract_place_info(raw_content)
+
+    return JSONResponse(content={"status": "success", "data": extracted_data})      
 
 @app.post("/api/places")
 async def save_place(place: PlaceItem, db: AsyncSession = Depends(get_db)):
@@ -177,11 +180,11 @@ async def save_place(place: PlaceItem, db: AsyncSession = Depends(get_db)):
     db.add(db_place)
     await db.commit()
     await db.refresh(db_place)
-    return {"status": "success", "data": {"id": db_place.id, **place.model_dump()}}
+    return {"status": "success", "data": {"id": db_place.id, **place.model_dump()}} 
 
 @app.get("/api/places")
 async def get_places(user_id: str, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(DBPlace).where(DBPlace.user_id == user_id))
+    result = await db.execute(select(DBPlace).where(DBPlace.user_id == user_id))    
     places = result.scalars().all()
     return {"status": "success", "data": [{"id": p.id, "name": p.name, "address": p.address, "category": p.category, "rating": p.rating, "summary": p.summary} for p in places]}
 
@@ -200,15 +203,15 @@ async def handle_webhook(request: Request):
             for entry in data.get("entry", []):
                 for messaging_event in entry.get("messaging", []):
                     sender_id = messaging_event["sender"]["id"]
-                    text = messaging_event.get("message", {}).get("text", "")
-                    urls = re.findall(r'https://www.instagram.com/[^\s]+', text)
+                    text = messaging_event.get("message", {}).get("text", "")       
+                    urls = re.findall(r'https://www.instagram.com/[^\s]+', text)    
                     if urls:
                         metadata = await get_instagram_metadata(urls[0])
                         if metadata:
                             extracted = await extract_place_info(metadata["raw_text"])
                             if extracted:
                                 p = extracted[0]
-                                query = f"{p['address']} {p['name']}".strip()
+                                query = f"{p['address']} {p['name']}".strip()       
                                 naver_url = f"https://m.map.naver.com/search2/search.naver?query={re.sub(r'\s+', '+', query)}"
                                 reply_msg = f"📍 '{p['name']}' 정보를 찾았어요!\n\n네이버 지도로 보기:\n{naver_url}"
                                 await send_ig_reply(sender_id, reply_msg)
