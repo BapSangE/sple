@@ -43,6 +43,7 @@ export default function RootLayout({
       <head>
         {/* 구글 애드센스 소유권 확인 및 스크립트 로드 */}
         <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3515900005800180" crossOrigin="anonymous"></script>
+        <meta name="referrer" content="strict-origin-when-cross-origin" />
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" />       
       </head>
@@ -64,8 +65,8 @@ export default function RootLayout({
         />
         {/* Naver Map API Load */}
         <Script
-          strategy="beforeInteractive"
-          src={`https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${process.env.NEXT_PUBLIC_NAVER_CLIENT_ID}`}
+          strategy="afterInteractive"
+          src={`https://openapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${process.env.NEXT_PUBLIC_NAVER_CLIENT_ID}`}
         />
 
         <Providers>

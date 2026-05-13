@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Check, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import AdBanner from "@/components/AdBanner";
+import { Map as MapIcon, ExternalLink } from "lucide-react";
 
 // TODO: 타입 정의는 분리하는 것이 좋습니다.
 interface Place {
@@ -58,6 +60,12 @@ export default function AddPage() {
     const newPlaces = [...places];
     newPlaces[index].selected = !newPlaces[index].selected;
     setPlaces(newPlaces);
+  };
+
+  const handleNaverMap = (e: React.MouseEvent, place: Place) => {
+    e.stopPropagation(); // 카드 클릭(체크박스 토글) 방지
+    const query = encodeURIComponent(`${place.name} ${place.address}`);
+    window.open(`https://m.map.naver.com/search2/search.naver?query=${query}`, "_blank");
   };
 
   const handleSave = async () => {
@@ -217,8 +225,20 @@ export default function AddPage() {
                       {place.address}
                     </p>
                   </div>
+                  
+                  {/* 네이버 지도 바로가기 버튼 */}
+                  <button
+                    onClick={(e) => handleNaverMap(e, place)}
+                    className="p-2 bg-secondary/10 text-secondary rounded-lg hover:bg-secondary/20 transition-colors shrink-0"
+                    title="네이버 지도로 보기"
+                  >
+                    <ExternalLink size={18} />
+                  </button>
                 </div>
               ))}
+              
+              {/* 바텀 시트 내 광고 배너 추가 */}
+              <AdBanner dataAdSlot="1234567890" />
             </div>
 
             <div className="pt-4">
