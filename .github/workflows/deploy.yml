@@ -82,8 +82,6 @@ jobs:
         env:
           BACKEND_HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
         run: |
-          if [ -n "$BACKEND_HEALTH_URL" ]; then
-            curl --fail --silent --show-error "$BACKEND_HEALTH_URL/health"
-          else
-            echo "BACKEND_HEALTH_URL is not set; skipping smoke test."
-          fi
+          HEALTH_URL="${BACKEND_HEALTH_URL:-https://api.sple-insta.com}"
+          curl --fail --silent --show-error "$HEALTH_URL/health"
+          curl --fail --silent --show-error "$HEALTH_URL/health/db"

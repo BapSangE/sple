@@ -91,3 +91,30 @@ Next required production check:
 4. Add real migration management before evolving the Supabase schema further.
 5. Decide how the map should display saved places without reliable geocoding from text-only extraction.
 6. Add production error monitoring for Gemini failures and backend 5xx responses.
+
+## Production Incident: Backend 503
+
+Time: 2026-05-15 KST
+
+Symptom:
+
+- `/add` showed `서버 연결에 실패했습니다.` during AI analysis.
+- Direct `https://api.sple-insta.com/health` returned `503 Service Temporarily Unavailable`.
+- Vercel `/api/analyze` returned `500` because the backend API was unavailable.
+
+Root cause:
+
+- ECS service had one running task and the task was healthy in target group `ecs-gateway-tg-a362ae7f53ada14ce`.
+- The ALB HTTPS listener was forwarding to the other target group, `ecs-gateway-tg-a375a790685ee2045`, which had no registered targets.
+- Because the listener pointed at an empty target group, the public backend domain returned 503.
+
+Recovery:
+
+- Updated the ALB HTTPS listener default action to forward to the healthy target group `ecs-gateway-tg-a362ae7f53ada14ce`.
+- Verified `https://api.sple-insta.com/health` returned 200.
+- Verified `https://sple-insta.com/api/analyze` returned 200 for the `43번지 혼술바` sample.
+- Verified the live `/add` UI reached the result screen and displayed `43번지 혼술바`.
+
+Prevention:
+
+- GitHub Actions backend smoke test now always checks `https://api.sple-insta.com/health` and `/health/db` after ECS deployment, even when `BACKEND_HEALTH_URL` is not configured.
