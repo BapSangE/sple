@@ -70,10 +70,13 @@ Changes made:
 - Save now checks every `POST /api/places` response and alerts the real failure.
 - Saved page now shows a load error instead of silently falling back to an empty list.
 - Added Supabase migration SQL: `migrations/2026-05-15_places_user_id_text.sql`.
+- Added a follow-up Supabase compatibility migration: `migrations/2026-05-15_places_insert_compatibility.sql`.
+- Updated the Vercel places API route to distinguish backend non-JSON/500 responses from true network connection failures.
 
 Next required production check:
 
 - Run `migrations/2026-05-15_places_user_id_text.sql` in Supabase SQL editor if `places.user_id` is not already `text`.
+- If saving still says the place save server cannot be reached, run `migrations/2026-05-15_places_insert_compatibility.sql` in Supabase SQL editor. This verifies insert defaults such as `places.id` auto-increment and relaxes stale optional legacy columns.
 
 ## Remaining Work
 

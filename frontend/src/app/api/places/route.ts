@@ -15,6 +15,39 @@ function getSessionUserId(sessionUser: unknown) {
   return (sessionUser as { id?: string } | undefined)?.id;
 }
 
+async function forwardBackendJson(response: Response, fallbackMessage: string) {
+  const bodyText = await response.text();
+
+  if (!bodyText) {
+    return NextResponse.json(
+      {
+        status: "error",
+        code: "BACKEND_EMPTY_RESPONSE",
+        message: `${fallbackMessage} (HTTP ${response.status})`,
+      },
+      { status: response.status || 502 },
+    );
+  }
+
+  try {
+    return NextResponse.json(JSON.parse(bodyText), { status: response.status });
+  } catch {
+    console.error("Backend returned a non-JSON places response", {
+      status: response.status,
+      body: bodyText.slice(0, 500),
+    });
+
+    return NextResponse.json(
+      {
+        status: "error",
+        code: "BACKEND_BAD_RESPONSE",
+        message: `${fallbackMessage} (HTTP ${response.status})`,
+      },
+      { status: response.status || 502 },
+    );
+  }
+}
+
 export async function GET() {
   const session = await getServerSession(authOptions);
   const userId = getSessionUserId(session?.user);
@@ -32,8 +65,7 @@ export async function GET() {
       },
     );
 
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
+    return forwardBackendJson(response, "저장된 장소를 불러오는 중 백엔드 오류가 발생했습니다.");
   } catch {
     return NextResponse.json(
       {
@@ -81,8 +113,7 @@ export async function POST(request: Request) {
       cache: "no-store",
     });
 
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
+    return forwardBackendJson(response, "장소 저장 처리 중 백엔드 오류가 발생했습니다.");
   } catch {
     return NextResponse.json(
       {
