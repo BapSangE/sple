@@ -40,6 +40,41 @@ _Updated: 2026-05-15_
 - Playwright local check: attempted against `http://127.0.0.1:3001/add`, but the Codex in-app browser blocked localhost navigation with `ERR_BLOCKED_BY_CLIENT`
 - Backend pytest: not runnable in the current local Windows environment because uv cannot start the configured `.venv` Python executable.
 
+## Post-Deploy Verification on 2026-05-15
+
+- Backend health: `https://api.sple-insta.com/health` returned `200` with `{"status":"ok","service":"sple-backend"}`.
+- Direct backend analysis call without internal key returned `401`, confirming `BACKEND_API_KEY` protection is active.
+- Vercel proxy analysis call returned `200`.
+- Node fetch with UTF-8 Korean text returned a valid extracted place:
+  - name: `어니언 성수`
+  - address: `서울특별시 성동구 아차산로9길 8`
+- Playwright live UI check confirmed `/add` now says:
+  - `인스타그램 캡션이나 맛집 소개 글을 복사해서 붙여넣어주세요!`
+- Playwright live extraction flow with sample text reached the result screen and displayed:
+  - `어니언 성수`
+  - `서울특별시 성동구 아차산로9길 8`
+
+## Save/List Issue Follow-Up
+
+Reported symptom: after clicking save, the list tab shows no saved places.
+
+Investigation from code:
+
+- The add page did not check `response.ok` for `POST /api/places`.
+- A failed save could still show “saved” and navigate to `/saved`.
+- The saved page did not expose API load errors, so a failed `GET /api/places` could look like an empty list.
+- `src/alter_db.py` shows an older migration path that added `places.user_id` as `INTEGER`; production now stores NextAuth Google subject ids, which are strings. If Supabase still has `user_id integer`, inserts will fail.
+
+Changes made:
+
+- Save now checks every `POST /api/places` response and alerts the real failure.
+- Saved page now shows a load error instead of silently falling back to an empty list.
+- Added Supabase migration SQL: `migrations/2026-05-15_places_user_id_text.sql`.
+
+Next required production check:
+
+- Run `migrations/2026-05-15_places_user_id_text.sql` in Supabase SQL editor if `places.user_id` is not already `text`.
+
 ## Remaining Work
 
 1. Confirm the next GitHub Actions deploy passes and ECS receives `BACKEND_API_KEY`.

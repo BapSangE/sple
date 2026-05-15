@@ -18,6 +18,7 @@ interface SavedPlace {
 interface PlacesResponse {
   status: string;
   data?: SavedPlace[];
+  message?: string;
 }
 
 const CATEGORIES = ['All', 'Cafe', 'Dining', 'Bar'];
@@ -26,6 +27,7 @@ export default function SavedPage() {
   const { data: session, status } = useSession();
   const [places, setPlaces] = useState<SavedPlace[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [selectedPlace, setSelectedPlace] = useState<SavedPlace | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -44,14 +46,21 @@ export default function SavedPage() {
         .then((data) => {
           const placesResponse = data as PlacesResponse;
           if (placesResponse.status === "success") {
+            setLoadError(null);
             setPlaces(placesResponse.data || []);
+          } else {
+            setLoadError(placesResponse.message || "저장된 장소를 불러오지 못했습니다.");
           }
         })
-        .catch((error) => console.error("Failed to fetch places:", error))
+        .catch((error) => {
+          console.error("Failed to fetch places:", error);
+          setLoadError("저장된 장소를 불러오지 못했습니다.");
+        })
         .finally(() => setIsLoading(false));
     } else {
       Promise.resolve().then(() => {
         setPlaces([]);
+        setLoadError(null);
         setIsLoading(false);
       });
     }
@@ -114,6 +123,11 @@ export default function SavedPage() {
         ) : isLoading ? (
           <div className="flex justify-center py-10">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        ) : loadError ? (
+          <div className="flex flex-col items-center justify-center py-10 text-red-500 text-center">
+            <span className="material-symbols-outlined text-4xl mb-2">error</span>
+            <p>{loadError}</p>
           </div>
         ) : filteredPlaces.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-gray-400">

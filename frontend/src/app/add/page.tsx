@@ -22,6 +22,24 @@ interface AnalyzeResponse {
   message?: string;
 }
 
+interface ApiErrorResponse {
+  message?: string;
+  code?: string;
+  detail?: {
+    message?: string;
+    code?: string;
+  };
+}
+
+async function readErrorMessage(response: Response) {
+  try {
+    const data = (await response.json()) as ApiErrorResponse;
+    return data.message || data.detail?.message || "장소 저장에 실패했습니다.";
+  } catch {
+    return "장소 저장에 실패했습니다.";
+  }
+}
+
 export default function AddPage() {
   const { data: session } = useSession();
   const [url, setUrl] = useState("");
@@ -98,8 +116,8 @@ export default function AddPage() {
     }
     try {
       // 선택된 장소들을 각각 서버에 저장
-      await Promise.all(
-        selectedPlaces.map(place => 
+      const responses = await Promise.all(
+        selectedPlaces.map((place) =>
           fetch(apiUrl("/api/places"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -107,15 +125,21 @@ export default function AddPage() {
               name: place.name,
               address: place.address,
             }),
-          })
-        )
+          }),
+        ),
       );
+
+      const failedResponse = responses.find((response) => !response.ok);
+      if (failedResponse) {
+        const message = await readErrorMessage(failedResponse);
+        throw new Error(message);
+      }
 
       alert(`${selectedPlaces.length}개의 장소가 저장되었습니다!`);
       router.push("/saved"); // 리스트 화면으로 이동
     } catch (error) {
       console.error("저장 중 오류 발생:", error);
-      alert("장소 저장에 실패했습니다.");
+      alert(error instanceof Error ? error.message : "장소 저장에 실패했습니다.");
     }
   };
 
