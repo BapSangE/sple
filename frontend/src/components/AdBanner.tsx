@@ -16,7 +16,7 @@ export default function AdBanner({
   useEffect(() => {
     try {
       // 컴포넌트가 마운트될 때 구글 광고 스크립트 실행
-      // @ts-ignore
+      // @ts-expect-error adsbygoogle is injected by the AdSense script.
       (window.adsbygoogle = window.adsbygoogle || []).push({});
     } catch (err) {
       console.error("AdSense Error:", err);

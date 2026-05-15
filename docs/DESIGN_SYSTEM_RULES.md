@@ -1,67 +1,88 @@
-# Sple Design System & Figma MCP Integration Rules
+# Sple Design System Rules
 
-This document outlines the design system conventions, component architecture, and styling rules for the **Sple** project. It serves as a master guide for AI coding agents to consistently implement Figma designs.
+_Updated: 2026-05-15_
+_Product basis: live demo at `https://www.sple-insta.com`_
 
-## 1. Frameworks & Libraries
-- **Framework:** Next.js 15 (App Router) + React (TypeScript)
-- **Styling:** Tailwind CSS v4
-- **Icons:** `lucide-react` (Primary), Google Material Symbols (Secondary fallback)
-- **Map:** Kakao Maps SDK / Naver Map SDK
+## 1. Product UI Principle
 
-## 2. Design System Structure & Tokens
-Design tokens are centrally defined in `frontend/src/app/globals.css` using Tailwind v4's `@theme` directive.
+Sple should feel like a compact mobile app even when running in the browser. The first visual impression is a map-first personal place collection, not a marketing site and not a plain form utility.
 
-**IMPORTANT: Never hardcode these values.** Always use the Tailwind utility classes derived from these variables.
+Keep the four primary surfaces consistent:
 
-### Color Tokens
-- **Primary (Main Orange):** `--color-primary` (`#FF8746`) -> `text-primary`, `bg-primary`
-- **Secondary (Dark Orange):** `--color-secondary` (`#FF6B1B`) -> `text-secondary`, `bg-secondary`
-- **Success:** `--color-success` (`#006C50`)
-- **Nav Background:** `--color-nav-bg` (`#2B2B2B`) -> `bg-[var(--color-nav-bg)]`
-- **Background:** `--color-background` (`#F6F3F2`) -> `bg-background`
-- **Surface (White):** `--color-surface` (`#FFFFFF`) -> `bg-surface`
-- **Text Primary:** `--color-text-primary` (`#1B1B1C`) -> `text-text-primary`
-- **Text Secondary:** `--color-text-secondary` (`#A1A1AA`) -> `text-text-secondary`
+- Map: explore saved or nearby places.
+- Add: paste an Instagram link or place text and run AI extraction.
+- List: search and filter the user's saved places.
+- Profile: Google sign-in and account controls.
 
-### Typography
-- **Font Family:** Pretendard (`--font-pretendard`) -> `font-sans`
-- Follow standard Tailwind text size scales (`text-sm`, `text-base`, `text-lg`, etc.).
+## 2. Frameworks
 
-### Spacing & Layout
-- Sple has an "App-like feel". The body avoids native scrolling (`overflow: hidden`).
-- Safe Margin: `--spacing-safe-margin` (`24px`).
-- Always respect `env(safe-area-inset-bottom)` for fixed bottom components like the Navigation Bar.
+- Frontend: Next.js App Router, React, TypeScript
+- Styling: Tailwind CSS v4 with tokens in `frontend/src/app/globals.css`
+- Icons: `lucide-react`
+- Font: local Pretendard via `next/font/local`
+- Backend: FastAPI, SQLAlchemy async
 
-## 3. Component Organization
-- **Pages (Routes):** Placed in `frontend/src/app/` (e.g., `app/page.tsx`, `app/add/page.tsx`).
-- **Global Components:** Placed in `frontend/src/components/` (e.g., `Map.tsx`).
-- **Layout Components:** Placed in `frontend/src/components/layout/` (e.g., `TopAppBar.tsx`, `BottomNavBar.tsx`).
-- All interactive components MUST include `"use client";` at the very top.
+## 3. Design Tokens
 
-## 4. Asset Management & Icons
-- **Static Assets:** Logos, placeholder images, and manifest files are stored in `frontend/public/` (e.g., `/sple_logo.svg`).
-- **Images:** Always use Next.js `<Image />` component (`next/image`) for optimized delivery.
-- **Icons:** Use the `lucide-react` library. Example: `import { Map, PlusCircle } from "lucide-react"`. Do not install new icon libraries. If an icon is completely custom, export it as an SVG from Figma and place it in `public/icons/`.
+Tokens live in `frontend/src/app/globals.css` inside the Tailwind `@theme` block.
 
-## 5. Figma MCP Integration Workflow
+Use these tokens instead of hardcoded color values when implementing UI:
 
-When a user requests implementing a screen or component from Figma, follow these rules strictly:
+- Primary orange: `--color-primary` (`#FF8746`)
+- Secondary orange: `--color-secondary` (`#FF6B1B`)
+- Success green: `--color-success` (`#006C50`)
+- Navigation background: `--color-nav-bg` (`#2B2B2B`)
+- App background: `--color-background` (`#F6F3F2`)
+- Surface: `--color-surface` (`#FFFFFF`)
+- Sheet: `--color-sheet` (`rgba(255, 255, 255, 0.9)`)
+- Text primary: `--color-text-primary` (`#1B1B1C`)
+- Text secondary: `--color-text-secondary` (`#A1A1AA`)
+- Safe margin: `--spacing-safe-margin` (`24px`)
 
-1. **Context Gathering:** 
-   - Run `get_design_context` using the provided Figma URL or `nodeId`.
-   - Run `get_screenshot` for visual reference of the exact node variant.
-2. **Analysis & Conversion:**
-   - Map Figma colors to the exact Tailwind tokens defined in `globals.css`. Do not extract hardcoded hex codes if a matching token exists.
-   - For icons, try to map Figma vectors to the closest `lucide-react` icon.
-   - For UI layout, replace absolute positioning (often output by Figma) with responsive Flexbox/Grid layouts (`flex`, `grid`, `items-center`, `justify-between`).
-3. **Implementation:**
-   - Translate the raw React output from MCP into the Sple Next.js App Router structure.
-   - Reuse existing components (e.g., `TopAppBar`, `BottomNavBar`) instead of building them from scratch.
-4. **Validation:**
-   - Compare your generated UI layout to the screenshot context.
-   - Ensure interactive states (like hover and active styles, e.g., `active:scale-95`, `transition-transform`) are added to buttons for a native app feel.
+Use Tailwind classes generated from tokens, such as `bg-background`, `text-primary`, `text-text-primary`, and `text-text-secondary`.
 
-## 6. Styling Approach
-- Use **Tailwind utility classes**. Avoid custom CSS unless absolutely necessary (like hiding scrollbars, which is done via `@utility hide-scrollbar`).
-- For "Glassmorphism" effects (like floating bars or modals), use `bg-white/90 backdrop-blur-md` combinations.
-- For shadows, use Tailwind's default shadow utilities (`shadow-sm`, `shadow-md`, `shadow-lg`) or exact box-shadow values if specified distinctively in Figma (e.g., `shadow-[0px_6px_15px_0px_rgba(0,0,0,0.1)]`).
+## 4. Layout Rules
+
+- Keep `TopAppBar` fixed at the top with centered Sple logo.
+- Keep `BottomNavBar` fixed near the bottom as a pill-shaped app nav.
+- Respect `env(safe-area-inset-bottom)` for fixed bottom UI.
+- Preserve the app-like `body` behavior: full viewport, hidden native page overflow, internal scrolling only where needed.
+- Do not introduce landing-page hero sections unless the product direction changes explicitly.
+
+## 5. Component Organization
+
+- Routes live in `frontend/src/app/`.
+- Shared components live in `frontend/src/components/`.
+- Layout shell components live in `frontend/src/components/layout/`.
+- API URL helpers live in `frontend/src/lib/`.
+- Interactive React components must start with `"use client";`.
+- Prefer reusing `TopAppBar`, `BottomNavBar`, `Map`, `AdBanner`, and existing page patterns before adding new primitives.
+
+## 6. Interaction Rules
+
+- Primary actions use the orange brand color and a clear pressed state such as `active:scale-[0.98]`.
+- Icon-only tab buttons must have accessible labels.
+- The add flow should communicate three states clearly: input, loading, result or failure.
+- Failure messages should distinguish between “server connection failed” and “AI could not find a place.”
+- Saved place cards should lead naturally to external map confirmation when a place is selected.
+
+## 7. Figma Implementation Rules
+
+The Figma plugin endpoint for generating rules returned `Method not found` during the 2026-05-15 cleanup, so these rules are maintained locally until the tool is available again.
+
+When implementing from Figma:
+
+1. Fetch the exact node context and screenshot when Figma MCP tools are available.
+2. Treat Figma output as design intent, not final code structure.
+3. Translate colors to Sple tokens from `globals.css`.
+4. Use `lucide-react` icons before adding custom assets.
+5. Store exported static assets in `frontend/public/`.
+6. Recreate layouts with responsive flex/grid rather than absolute-positioned exports.
+7. Validate against the live app shell: top logo bar, bottom nav, mobile-safe spacing, and app-like viewport behavior.
+
+## 8. Accessibility
+
+- Buttons that show only icons must use `aria-label`.
+- Text contrast must remain readable on `bg-background` and white surfaces.
+- Inputs must have placeholders or labels that explain the expected content.
+- Login-gated states must explain what the user gets after signing in.

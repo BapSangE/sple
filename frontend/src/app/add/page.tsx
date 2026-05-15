@@ -6,13 +6,20 @@ import { Check, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import AdBanner from "@/components/AdBanner";
-import { Map as MapIcon, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
+import { apiUrl } from "@/lib/api";
 
 // TODO: 타입 정의는 분리하는 것이 좋습니다.
 interface Place {
   name: string;
   address: string;
   selected?: boolean;
+}
+
+interface AnalyzeResponse {
+  status: string;
+  data?: Array<Pick<Place, "name" | "address">> | null;
+  message?: string;
 }
 
 export default function AddPage() {
@@ -32,23 +39,29 @@ export default function AddPage() {
     setError(null);
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analyze`, {
+      const res = await fetch(apiUrl("/api/analyze"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({ text: url.trim() }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as AnalyzeResponse;
+
+      if (!res.ok) {
+        setError(data.message || "장소가 언급된 텍스트를 복사해 붙여넣어 주세요.");
+        setStep("input");
+        return;
+      }
       
       if (data.status === "success" && data.data && data.data.length > 0) {
         // 모든 가게를 기본적으로 선택된 상태로 설정
-        const extractedPlaces = data.data.map((p: any) => ({ ...p, selected: true }));
+        const extractedPlaces = data.data.map((place) => ({ ...place, selected: true }));
         setPlaces(extractedPlaces);
         setStep("result");
       } else {
         setError("앗! 장소 정보를 찾지 못했어요. 상호명이 본문에 적힌 다른 링크로 시도해 주세요! 📍");
         setStep("input");
       }
-    } catch (err) {
+    } catch {
       setError("서버 연결에 실패했습니다.");
       setStep("input");
     } finally {
@@ -75,23 +88,22 @@ export default function AddPage() {
       return;
     }
 
-    if (!session?.user || !(session.user as any).id) {
+    const userId = session?.user
+      ? (session.user as typeof session.user & { id?: string }).id
+      : undefined;
+
+    if (!userId) {
       alert("로그인이 필요합니다. 프로필 탭에서 로그인해주세요.");
       return;
     }
-
-    const userId = (session.user as any).id;
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
-
     try {
       // 선택된 장소들을 각각 서버에 저장
       await Promise.all(
         selectedPlaces.map(place => 
-          fetch(`${apiUrl}/api/places`, {
+          fetch(apiUrl("/api/places"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              user_id: userId,
               name: place.name,
               address: place.address,
             }),
@@ -123,7 +135,7 @@ export default function AddPage() {
             <div className="text-center mt-10 mb-4">
               <h2 className="text-2xl font-bold text-text-primary mb-2">장소 추출하기</h2>
               <p className="text-text-secondary text-sm leading-relaxed">
-                인스타그램 게시물 링크나<br/>맛집 정보 텍스트를 붙여넣어주세요!
+                인스타그램 캡션이나 맛집 소개 글을<br/>복사해서 붙여넣어주세요!
               </p>
             </div>
 
@@ -131,16 +143,16 @@ export default function AddPage() {
               <textarea
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="이곳에 붙여넣기"
+                placeholder="예: 성수동 어니언. 서울 성동구 아차산로9길 8..."
                 className="w-full h-32 p-4 text-base bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder-gray-400 shadow-sm resize-none"
               />
 
               <button 
                 onClick={handleExtract}
-                disabled={!url.trim()}
+                disabled={isLoading || !url.trim()}
                 className="w-full h-[52px] flex items-center justify-center gap-2 bg-primary text-white rounded-xl text-[16px] font-bold transition-all active:scale-[0.98] shadow-[0_8px_16px_rgba(255,90,95,0.25)] disabled:bg-gray-300 disabled:text-gray-500 disabled:shadow-none disabled:active:scale-100"
               >
-                AI 분석하기
+                {isLoading ? "분석 중..." : "AI 분석하기"}
               </button>
             </div>
 

@@ -4,7 +4,15 @@ import { useEffect, useRef } from "react";
 
 declare global {
   interface Window {
-    naver: any;
+    naver?: {
+      maps?: {
+        LatLng: new (lat: number, lng: number) => unknown;
+        Map: new (
+          element: HTMLElement,
+          options: Record<string, unknown>
+        ) => unknown;
+      };
+    };
   }
 }
 
@@ -28,9 +36,7 @@ export default function Map() {
         zoomControl: false, // 커스텀 버튼을 위해 기본 숨김
       };
 
-      const map = new window.naver.maps.Map(mapElement.current, mapOptions);
-
-      // 추후 내 위치 이동 등의 로직을 위해 map 객체를 상태로 관리할 수 있습니다.
+      new window.naver.maps.Map(mapElement.current, mapOptions);
     };
 
     // 스크립트가 아직 로드되지 않은 경우를 대비한 인터벌 처리

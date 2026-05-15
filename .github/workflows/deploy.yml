@@ -13,6 +13,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Run backend contract tests
+        env:
+          DATABASE_URL: sqlite+aiosqlite:///./test-ci.db
+        run: |
+          uv run pytest tests/test_e2e_api.py tests/test_places_api.py -q
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -53,6 +67,7 @@ jobs:
             GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
             NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+            BACKEND_API_KEY=${{ secrets.BACKEND_API_KEY }}
 
       # 3. ECS 서비스 배포
       - name: Deploy to Amazon ECS
@@ -62,3 +77,13 @@ jobs:
           service: sple-backend-6440
           cluster: default
           wait-for-service-stability: true
+
+      - name: Smoke test backend health endpoint
+        env:
+          BACKEND_HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
+        run: |
+          if [ -n "$BACKEND_HEALTH_URL" ]; then
+            curl --fail --silent --show-error "$BACKEND_HEALTH_URL/health"
+          else
+            echo "BACKEND_HEALTH_URL is not set; skipping smoke test."
+          fi

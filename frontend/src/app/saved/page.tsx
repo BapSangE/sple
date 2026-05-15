@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, MapPin, X } from "lucide-react";
+import { apiUrl } from "@/lib/api";
 
 interface SavedPlace {
   id: number;
@@ -12,6 +13,11 @@ interface SavedPlace {
   category: string;
   rating: number;
   summary: string;
+}
+
+interface PlacesResponse {
+  status: string;
+  data?: SavedPlace[];
 }
 
 const CATEGORIES = ['All', 'Cafe', 'Dining', 'Bar'];
@@ -28,22 +34,26 @@ export default function SavedPage() {
   useEffect(() => {
     if (status === "loading") return;
 
-    if (session?.user && (session.user as any).id) {
-      const userId = (session.user as any).id;
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
-      
-      fetch(`${apiUrl}/api/places?user_id=${userId}`)
+    const userId = session?.user
+      ? (session.user as typeof session.user & { id?: string }).id
+      : undefined;
+
+    if (userId) {
+      fetch(apiUrl("/api/places"))
         .then((res) => res.json())
         .then((data) => {
-          if (data.status === "success") {
-            setPlaces(data.data);
+          const placesResponse = data as PlacesResponse;
+          if (placesResponse.status === "success") {
+            setPlaces(placesResponse.data || []);
           }
         })
         .catch((error) => console.error("Failed to fetch places:", error))
         .finally(() => setIsLoading(false));
     } else {
-      setPlaces([]);
-      setIsLoading(false);
+      Promise.resolve().then(() => {
+        setPlaces([]);
+        setIsLoading(false);
+      });
     }
   }, [session, status]);
 

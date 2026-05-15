@@ -1,20 +1,18 @@
 ﻿from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, HTTPException, Depends
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 import logging
 from dotenv import load_dotenv
-import httpx
-from bs4 import BeautifulSoup
 from google import genai
 import json
 import re
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, text as sql_text
 from database import get_db, init_db, Place as DBPlace
 
 # .env 파일 로드
@@ -32,6 +30,15 @@ GCP_LOCATION = os.getenv("GCP_LOCATION", "us-central1")
 FB_VERIFY_TOKEN = os.getenv("FB_VERIFY_TOKEN", "sple_default_token")
 IG_PAGE_ACCESS_TOKEN = os.getenv("IG_PAGE_ACCESS_TOKEN")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://sple-insta.com")
+BACKEND_API_KEY = os.getenv("BACKEND_API_KEY")
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "ALLOWED_ORIGINS",
+        f"{FRONTEND_URL},https://www.sple-insta.com,http://localhost:3000",
+    ).split(",")
+    if origin.strip()
+]
 
 # Gemini 클라이언트 초기화
 client = None
@@ -89,14 +96,14 @@ app = FastAPI(title="Sple Reboot API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-class PlaceRequest(BaseModel):
-    url: str
+class AnalyzeRequest(BaseModel):
+    text: str
 
 class PlaceItem(BaseModel):
     user_id: str
@@ -106,10 +113,29 @@ class PlaceItem(BaseModel):
     rating: Optional[float] = None
     summary: Optional[str] = None
 
+
+def serialize_place(place: DBPlace) -> dict:
+    return {
+        "id": place.id,
+        "user_id": place.user_id,
+        "name": place.name,
+        "address": place.address,
+        "category": place.category,
+        "rating": place.rating,
+        "summary": place.summary,
+    }
+
+
 async def extract_place_info(text: str):
     if not client:
         return None
-    prompt = f"당신은 장소 추출 AI입니다. 텍스트에서 상호명과 주소를 JSON 배열로 추출하세요. 텍스트: {text}"
+    prompt = (
+        "당신은 한국 맛집/장소 텍스트에서 장소 정보를 추출하는 AI입니다. "
+        "사용자가 복사해 붙여넣은 텍스트에서 상호명과 주소만 JSON 배열로 추출하세요. "
+        "반드시 다른 설명 없이 JSON 배열만 반환하세요. "
+        '형식: [{"name":"상호명","address":"주소"}]. '
+        f"텍스트: {text}"
+    )
     try:
         response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
         match = re.search(r'\[.*\]', response.text, re.DOTALL)
@@ -118,14 +144,87 @@ async def extract_place_info(text: str):
         logger.error(f"AI Error: {e}")
     return None
 
+
+def normalize_text_input(text: str) -> str:
+    return " ".join(text.split())
+
+
+def is_url_only_input(text: str) -> bool:
+    normalized = normalize_text_input(text).lower()
+    return normalized.startswith(("http://", "https://")) and " " not in normalized
+
+
+async def verify_internal_api_key(x_sple_internal_key: Optional[str] = Header(default=None)):
+    if BACKEND_API_KEY and x_sple_internal_key != BACKEND_API_KEY:
+        raise HTTPException(status_code=401, detail={"code": "UNAUTHORIZED"})
+
 @app.get("/")
 async def read_root():
     return {"status": "online", "message": "Sple Reboot API is running"}
 
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "service": "sple-backend"}
+
+
+@app.get("/health/db")
+async def db_health_check(db: AsyncSession = Depends(get_db)):
+    await db.execute(sql_text("SELECT 1"))
+    return {"status": "ok", "database": "reachable"}
+
 @app.post("/api/analyze")
-async def analyze_place_api(request: PlaceRequest):
-    extracted_data = await extract_place_info(request.url)
+async def analyze_place_api(
+    request: AnalyzeRequest,
+    _: None = Depends(verify_internal_api_key),
+):
+    text = normalize_text_input(request.text)
+    if not text or is_url_only_input(text):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "TEXT_REQUIRED",
+                "message": "장소가 언급된 텍스트를 복사해 붙여넣어 주세요.",
+            },
+        )
+
+    extracted_data = await extract_place_info(text)
     return JSONResponse(content={"status": "success", "data": extracted_data})
+
+
+@app.post("/api/places")
+async def create_place_api(
+    place: PlaceItem,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(verify_internal_api_key),
+):
+    db_place = DBPlace(
+        user_id=place.user_id,
+        name=place.name,
+        address=place.address,
+        category=place.category,
+        rating=place.rating,
+        summary=place.summary,
+    )
+    db.add(db_place)
+    await db.commit()
+    await db.refresh(db_place)
+    return JSONResponse(content={"status": "success", "data": serialize_place(db_place)})
+
+
+@app.get("/api/places")
+async def list_places_api(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(verify_internal_api_key),
+):
+    result = await db.execute(
+        select(DBPlace)
+        .where(DBPlace.user_id == user_id)
+        .order_by(DBPlace.id.desc())
+    )
+    places = [serialize_place(place) for place in result.scalars().all()]
+    return JSONResponse(content={"status": "success", "data": places})
 
 if __name__ == "__main__":
     import uvicorn

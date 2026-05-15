@@ -14,7 +14,7 @@ async def test_extraction():
     # .env 로드
     load_dotenv()
     
-    # 가상의 인스타그램 캡션 텍스트
+    # 사용자가 복사해 붙여넣은 맛집 텍스트
     sample_text = """
     주말에 다녀온 성수동 카페 '어니언'! 
     공간도 넓고 팡도르가 너무 맛있었어요. 
