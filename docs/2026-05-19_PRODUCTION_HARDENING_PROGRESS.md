@@ -244,6 +244,40 @@ https://sple-insta.com/api/auth/callback/google
 - Frontend production build: passed.
 - Backend pytest는 현재 Windows 로컬 `uv` Python 실행 문제로 실행하지 못했다. CI Ubuntu 환경에서 확인 필요.
 
+## 2026-05-19 Service Worker Follow-Up
+
+증상:
+
+- 브라우저 콘솔에 `[SW] Fetch failed: https://sple-insta.com/add TypeError: Failed to fetch`가 표시됐다.
+- 이어서 `The FetchEvent ... resulted in a network error response` 경고가 표시됐다.
+- `ServiceWorker registration successful` 로그도 함께 표시됐다.
+
+의미:
+
+- 기존 `public/sw.js`가 모든 GET 요청을 가로채고 있었다.
+- `/add` 같은 페이지 navigation 요청도 Service Worker가 `fetch(event.request)`로 직접 처리했다.
+- 네트워크가 순간적으로 실패하면 Service Worker가 503 offline 응답 또는 network error response를 만들 수 있었다.
+- 현재 서비스는 오프라인 캐시 전략이 완성된 PWA가 아니므로, 실서비스 안정성 기준에서는 Service Worker를 끄는 편이 안전하다.
+
+조치:
+
+- `layout.tsx`에서 새 방문 시 기존 Service Worker 등록을 모두 해제하도록 변경했다.
+- 브라우저 Cache Storage도 함께 삭제하도록 했다.
+- `public/sw.js`는 fetch event를 처리하지 않는 no-op 파일로 교체하고 activate 시 자기 자신을 unregister하도록 했다.
+
+사용자 확인:
+
+1. Vercel 배포 후 `https://www.sple-insta.com/add`를 새로고침한다.
+2. Chrome DevTools > Application > Service Workers에서 `sple-insta.com` scope가 사라졌는지 확인한다.
+3. 남아 있으면 `Unregister`를 누른 뒤 새로고침한다.
+4. Application > Storage > Clear site data를 한 번 실행하면 가장 확실하다.
+
+검증:
+
+- Frontend lint: passed.
+- Frontend type check: passed.
+- Frontend production build: passed.
+
 ### P1
 
 - 주소 geocoding 추가 후 지도에 저장 장소 마커 표시.
