@@ -9,10 +9,13 @@ import { apiUrl } from "@/lib/api";
 interface SavedPlace {
   id: number;
   name: string;
-  address: string;
+  address?: string;
   category: string;
   rating: number;
   summary: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  geocoding_status?: string;
 }
 
 interface PlacesResponse {
@@ -21,6 +24,37 @@ interface PlacesResponse {
   message?: string;
 }
 
+interface NaverGeocodeItem {
+  point?: {
+    x?: number;
+    y?: number;
+  };
+}
+
+interface NaverGeocodeResponse {
+  result?: {
+    items?: NaverGeocodeItem[];
+  };
+}
+
+interface NaverGeocoderService {
+  Status: {
+    OK: string;
+  };
+  geocode: (
+    options: { address: string },
+    callback: (status: string, response: NaverGeocodeResponse) => void,
+  ) => void;
+}
+
+type NaverGeocoderWindow = Window & {
+  naver?: {
+    maps?: {
+      Service?: NaverGeocoderService;
+    };
+  };
+};
+
 const CATEGORIES = ['All', 'Cafe', 'Dining', 'Bar'];
 
 export default function SavedPage() {
@@ -28,6 +62,9 @@ export default function SavedPage() {
   const [places, setPlaces] = useState<SavedPlace[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [addressDraft, setAddressDraft] = useState("");
+  const [isUpdatingAddress, setIsUpdatingAddress] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   const [selectedPlace, setSelectedPlace] = useState<SavedPlace | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -70,14 +107,105 @@ export default function SavedPage() {
     return places.filter((place) => {
       const matchesCategory = selectedCategory === "All" || place.category === selectedCategory;
       const matchesSearch = place.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            place.address.toLowerCase().includes(searchQuery.toLowerCase());
+                            (place.address || "").toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     });
   }, [places, searchQuery, selectedCategory]);
 
   const handleNaverMap = (place: SavedPlace) => {
+    if (!place.address) return;
     const query = encodeURIComponent(`${place.address} ${place.name}`);
     window.open(`https://m.map.naver.com/search2/search.naver?query=${query}`, "_blank");
+  };
+
+  const handleFindBranch = (place: SavedPlace) => {
+    const query = encodeURIComponent(place.name);
+    window.open(`https://m.map.naver.com/search2/search.naver?query=${query}`, "_blank");
+  };
+
+  const geocodeAddress = (address: string) =>
+    new Promise<{ latitude: number; longitude: number } | null>((resolve) => {
+      const service = (window as NaverGeocoderWindow).naver?.maps?.Service;
+
+      if (!service) {
+        resolve(null);
+        return;
+      }
+
+      service.geocode({ address }, (status, response) => {
+        if (status !== service.Status.OK) {
+          resolve(null);
+          return;
+        }
+
+        const point = response.result?.items?.[0]?.point;
+        if (typeof point?.y !== "number" || typeof point.x !== "number") {
+          resolve(null);
+          return;
+        }
+
+        resolve({ latitude: point.y, longitude: point.x });
+      });
+    });
+
+  const openPlaceDetail = (place: SavedPlace) => {
+    setSelectedPlace(place);
+    setAddressDraft(place.address || "");
+    setUpdateError(null);
+  };
+
+  const closePlaceDetail = () => {
+    setSelectedPlace(null);
+    setAddressDraft("");
+    setUpdateError(null);
+  };
+
+  const handleUpdateAddress = async () => {
+    if (!selectedPlace) return;
+
+    const nextAddress = addressDraft.trim();
+    if (!nextAddress) {
+      setUpdateError("주소를 입력해주세요.");
+      return;
+    }
+
+    setIsUpdatingAddress(true);
+    setUpdateError(null);
+
+    try {
+      const coordinates = await geocodeAddress(nextAddress);
+      const response = await fetch(apiUrl("/api/places"), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: selectedPlace.id,
+          name: selectedPlace.name,
+          address: nextAddress,
+          category: selectedPlace.category,
+          rating: selectedPlace.rating,
+          summary: selectedPlace.summary,
+          latitude: coordinates?.latitude ?? null,
+          longitude: coordinates?.longitude ?? null,
+          geocoding_status: coordinates ? "resolved" : "failed",
+        }),
+      });
+
+      const data = (await response.json()) as PlacesResponse & { data?: SavedPlace };
+
+      if (!response.ok || data.status !== "success" || !data.data) {
+        throw new Error(data.message || "주소를 저장하지 못했습니다.");
+      }
+
+      setPlaces((currentPlaces) =>
+        currentPlaces.map((place) => (place.id === data.data?.id ? data.data : place)),
+      );
+      setSelectedPlace(data.data);
+      setAddressDraft(data.data.address || "");
+    } catch (error) {
+      setUpdateError(error instanceof Error ? error.message : "주소를 저장하지 못했습니다.");
+    } finally {
+      setIsUpdatingAddress(false);
+    }
   };
 
   return (
@@ -138,7 +266,7 @@ export default function SavedPage() {
           filteredPlaces.map((place) => (
             <div 
               key={place.id} 
-              onClick={() => setSelectedPlace(place)}
+              onClick={() => openPlaceDetail(place)}
               className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 cursor-pointer active:scale-[0.98] transition-all"
             >
               <div className="flex justify-between items-start mb-2">
@@ -151,7 +279,7 @@ export default function SavedPage() {
                 )}
               </div>
               <p className="text-text-secondary text-sm flex items-center gap-1">
-                <MapPin size={14} /> {place.address}
+                <MapPin size={14} /> {place.address || "주소 정보 없음"}
               </p>
             </div>
           ))
@@ -166,7 +294,7 @@ export default function SavedPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setSelectedPlace(null)}
+              onClick={closePlaceDetail}
               className="absolute inset-0 bg-black/40 backdrop-blur-sm z-[60]"
             />
             <motion.div
@@ -182,10 +310,10 @@ export default function SavedPage() {
                 <div>
                   <h2 className="text-2xl font-bold text-text-primary mb-1">{selectedPlace.name}</h2>
                   <p className="text-text-secondary text-sm flex items-center gap-1">
-                    <MapPin size={14} /> {selectedPlace.address}
+                    <MapPin size={14} /> {selectedPlace.address || "주소 정보 없음"}
                   </p>
                 </div>
-                <button onClick={() => setSelectedPlace(null)} className="p-2 bg-gray-100 rounded-full">
+                <button onClick={closePlaceDetail} className="p-2 bg-gray-100 rounded-full">
                   <X size={20} className="text-gray-500" />
                 </button>
               </div>
@@ -202,11 +330,42 @@ export default function SavedPage() {
                 </div>
               )}
 
+              <div className="mb-6 rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                <label className="mb-2 block text-sm font-bold text-text-primary">
+                  주소
+                </label>
+                <input
+                  value={addressDraft}
+                  onChange={(event) => setAddressDraft(event.target.value)}
+                  placeholder="네이버 지도에서 확인한 주소를 입력하세요"
+                  className="mb-3 h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                />
+                {updateError && (
+                  <p className="mb-3 text-sm text-red-500">{updateError}</p>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => handleFindBranch(selectedPlace)}
+                    className="h-11 rounded-xl border border-gray-200 bg-white text-sm font-bold text-text-primary active:scale-[0.98] transition-all"
+                  >
+                    지점 찾기
+                  </button>
+                  <button
+                    onClick={handleUpdateAddress}
+                    disabled={isUpdatingAddress}
+                    className="h-11 rounded-xl bg-primary text-sm font-bold text-white active:scale-[0.98] transition-all disabled:bg-gray-300 disabled:text-gray-500"
+                  >
+                    {isUpdatingAddress ? "저장 중..." : "주소 저장"}
+                  </button>
+                </div>
+              </div>
+
               <button 
                 onClick={() => handleNaverMap(selectedPlace)}
-                className="w-full h-[52px] flex items-center justify-center gap-2 bg-[#03C75A] text-white rounded-xl font-bold text-base shadow-[0_8px_16px_rgba(3,199,90,0.2)] active:scale-[0.98] transition-all"
+                disabled={!selectedPlace.address}
+                className="w-full h-[52px] flex items-center justify-center gap-2 bg-[#03C75A] text-white rounded-xl font-bold text-base shadow-[0_8px_16px_rgba(3,199,90,0.2)] active:scale-[0.98] transition-all disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none disabled:active:scale-100"
               >
-                네이버 지도로 확인하기
+                {selectedPlace.address ? "네이버 지도로 확인하기" : "주소 정보가 필요합니다"}
               </button>
             </motion.div>
           </>

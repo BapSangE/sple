@@ -12,7 +12,7 @@ import { apiUrl } from "@/lib/api";
 // TODO: 타입 정의는 분리하는 것이 좋습니다.
 interface Place {
   name: string;
-  address: string;
+  address?: string;
   selected?: boolean;
 }
 
@@ -44,7 +44,7 @@ function normalizePlace(place: Partial<Pick<Place, "name" | "address">>): Place 
   const name = place.name?.trim();
   const address = place.address?.trim();
 
-  if (!name || !address) {
+  if (!name) {
     return null;
   }
 
@@ -90,7 +90,7 @@ export default function AddPage() {
           setPlaces(extractedPlaces);
           setStep("result");
         } else {
-          setError("장소명과 주소를 함께 찾지 못했어요. 주소가 포함된 텍스트로 다시 시도해 주세요.");
+          setError("장소명을 찾지 못했어요. 매장명이 포함된 텍스트로 다시 시도해 주세요.");
           setStep("input");
         }
       } else {
@@ -124,7 +124,7 @@ export default function AddPage() {
       .filter((place): place is Place => place !== null);
 
     if (selectedPlaces.length === 0) {
-      alert("저장할 수 있는 장소가 없습니다. 장소명과 주소가 함께 있는 결과를 선택해주세요.");
+      alert("저장할 수 있는 장소가 없습니다. 장소명이 있는 결과를 선택해주세요.");
       return;
     }
 
@@ -145,7 +145,7 @@ export default function AddPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               name: place.name,
-              address: place.address,
+              address: place.address || "",
             }),
           }),
         ),
@@ -280,15 +280,16 @@ export default function AddPage() {
                       {place.name}
                     </h3>
                     <p className="text-xs text-text-secondary truncate mt-1">
-                      {place.address}
+                      {place.address || "주소 정보 없음"}
                     </p>
                   </div>
                   
                   {/* 네이버 지도 바로가기 버튼 */}
                   <button
                     onClick={(e) => handleNaverMap(e, place)}
-                    className="p-2 bg-secondary/10 text-secondary rounded-lg hover:bg-secondary/20 transition-colors shrink-0"
-                    title="네이버 지도로 보기"
+                    disabled={!place.address}
+                    className="p-2 bg-secondary/10 text-secondary rounded-lg hover:bg-secondary/20 transition-colors shrink-0 disabled:bg-gray-100 disabled:text-gray-300 disabled:cursor-not-allowed"
+                    title={place.address ? "네이버 지도로 보기" : "주소가 없어 지도로 볼 수 없습니다"}
                   >
                     <ExternalLink size={18} />
                   </button>

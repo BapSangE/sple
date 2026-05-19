@@ -1,57 +1,119 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
+import { apiUrl } from "@/lib/api";
 
-declare global {
-  interface Window {
-    naver?: {
-      maps?: {
-        LatLng: new (lat: number, lng: number) => unknown;
-        Map: new (
-          element: HTMLElement,
-          options: Record<string, unknown>
-        ) => unknown;
-      };
-    };
-  }
+interface MapPlace {
+  id: number;
+  name: string;
+  address?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+interface PlacesResponse {
+  status: string;
+  data?: MapPlace[];
+}
+
+type NaverLatLng = object;
+
+interface NaverMap {
+  setCenter: (latLng: NaverLatLng) => void;
+  setZoom: (zoom: number) => void;
+}
+
+interface NaverMapsApi {
+  LatLng: new (lat: number, lng: number) => NaverLatLng;
+  Map: new (element: HTMLElement, options: Record<string, unknown>) => NaverMap;
+  Marker: new (options: { position: NaverLatLng; map: NaverMap; title?: string }) => unknown;
+}
+
+type NaverWindow = Window & {
+  naver?: {
+    maps?: NaverMapsApi;
+  };
+};
+
+function getNaverMaps() {
+  return (window as NaverWindow).naver?.maps;
+}
+
+function hasCoordinates(place: MapPlace) {
+  return typeof place.latitude === "number" && typeof place.longitude === "number";
 }
 
 export default function Map() {
+  const { status } = useSession();
   const mapElement = useRef<HTMLDivElement>(null);
+  const [places, setPlaces] = useState<MapPlace[]>([]);
 
   useEffect(() => {
-    // 네이버 지도 스크립트가 로드되었는지 확인
-    const initMap = () => {
-      if (!mapElement.current || !window.naver || !window.naver.maps) return;
+    if (status !== "authenticated") {
+      return;
+    }
 
-      // 서울시청 중심 좌표
-      const location = new window.naver.maps.LatLng(37.5666805, 126.9784147);
-      
-      const mapOptions = {
-        center: location,
+    fetch(apiUrl("/api/places"))
+      .then((response) => response.json())
+      .then((data: PlacesResponse) => {
+        if (data.status === "success") {
+          setPlaces(data.data || []);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load map places:", error);
+      });
+  }, [status]);
+
+  useEffect(() => {
+    const initMap = () => {
+      const maps = getNaverMaps();
+      if (!mapElement.current || !maps) return;
+
+      const defaultLocation = new maps.LatLng(37.5666805, 126.9784147);
+      const map = new maps.Map(mapElement.current, {
+        center: defaultLocation,
         zoom: 15,
         minZoom: 10,
         scaleControl: false,
         mapDataControl: false,
-        zoomControl: false, // 커스텀 버튼을 위해 기본 숨김
-      };
+        zoomControl: false,
+      });
 
-      new window.naver.maps.Map(mapElement.current, mapOptions);
+      const visiblePlaces = status === "authenticated" ? places : [];
+      const markerPlaces = visiblePlaces.filter(hasCoordinates);
+
+      markerPlaces.forEach((place) => {
+        const markerPosition = new maps.LatLng(place.latitude as number, place.longitude as number);
+        new maps.Marker({
+          position: markerPosition,
+          map,
+          title: place.name,
+        });
+      });
+
+      const firstPlace = markerPlaces[0];
+      if (firstPlace) {
+        map.setCenter(new maps.LatLng(firstPlace.latitude as number, firstPlace.longitude as number));
+        map.setZoom(13);
+      }
     };
 
-    // 스크립트가 아직 로드되지 않은 경우를 대비한 인터벌 처리
-    if (window.naver && window.naver.maps) {
+    if (getNaverMaps()) {
       initMap();
-    } else {
-      const timer = setInterval(() => {
-        if (window.naver && window.naver.maps) {
-          clearInterval(timer);
-          initMap();
-        }
-      }, 100);
-      return () => clearInterval(timer);
+      return;
     }
-  }, []);
 
-  return <div ref={mapElement} className="w-full h-full bg-[#E5E2E1]" />;
+    const timer = window.setInterval(() => {
+      if (getNaverMaps()) {
+        window.clearInterval(timer);
+        initMap();
+      }
+    }, 100);
+
+    return () => window.clearInterval(timer);
+  }, [places, status]);
+
+  return <div ref={mapElement} className="h-full w-full bg-[#E5E2E1]" />;
 }

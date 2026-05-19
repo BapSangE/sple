@@ -9,6 +9,9 @@ interface PlaceBody {
   category?: string;
   rating?: number;
   summary?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  geocoding_status?: string;
 }
 
 function getSessionUserId(sessionUser: unknown) {
@@ -87,12 +90,12 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json()) as PlaceBody;
-  if (!body.name?.trim() || !body.address?.trim()) {
+  if (!body.name?.trim()) {
     return NextResponse.json(
       {
         status: "error",
         code: "INVALID_PLACE",
-        message: "장소명과 주소가 필요합니다.",
+        message: "장소명이 필요합니다.",
       },
       { status: 400 },
     );
@@ -104,11 +107,14 @@ export async function POST(request: Request) {
       headers: backendHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         user_id: userId,
-        name: body.name,
-        address: body.address,
+        name: body.name.trim(),
+        address: body.address?.trim() || "",
         category: body.category,
         rating: body.rating,
         summary: body.summary,
+        latitude: body.latitude,
+        longitude: body.longitude,
+        geocoding_status: body.geocoding_status || "pending",
       }),
       cache: "no-store",
     });
@@ -120,6 +126,57 @@ export async function POST(request: Request) {
         status: "error",
         code: "BACKEND_UNREACHABLE",
         message: "장소 저장 서버에 연결하지 못했습니다.",
+      },
+      { status: 502 },
+    );
+  }
+}
+
+export async function PATCH(request: Request) {
+  const session = await getServerSession(authOptions);
+  const userId = getSessionUserId(session?.user);
+
+  if (!userId) {
+    return NextResponse.json({ status: "error", code: "UNAUTHORIZED" }, { status: 401 });
+  }
+
+  const body = (await request.json()) as PlaceBody & { id?: number };
+  if (!body.id || !body.name?.trim()) {
+    return NextResponse.json(
+      {
+        status: "error",
+        code: "INVALID_PLACE",
+        message: "수정할 장소와 장소명이 필요합니다.",
+      },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const response = await fetch(backendUrl(`/api/places/${body.id}`), {
+      method: "PATCH",
+      headers: backendHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        user_id: userId,
+        name: body.name.trim(),
+        address: body.address?.trim() || "",
+        category: body.category,
+        rating: body.rating,
+        summary: body.summary,
+        latitude: body.latitude,
+        longitude: body.longitude,
+        geocoding_status: body.geocoding_status || "pending",
+      }),
+      cache: "no-store",
+    });
+
+    return forwardBackendJson(response, "장소 수정 처리 중 백엔드 오류가 발생했습니다.");
+  } catch {
+    return NextResponse.json(
+      {
+        status: "error",
+        code: "BACKEND_UNREACHABLE",
+        message: "장소 수정 서버에 연결하지 못했습니다.",
       },
       { status: 502 },
     );

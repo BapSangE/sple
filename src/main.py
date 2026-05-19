@@ -108,16 +108,28 @@ class AnalyzeRequest(BaseModel):
 class PlaceItem(BaseModel):
     user_id: str
     name: str
-    address: str
+    address: str = ""
     category: str = "All"
     rating: Optional[float] = None
     summary: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    geocoding_status: str = "pending"
 
-    @field_validator("user_id", "name", "address", mode="before")
+    @field_validator("user_id", "name", mode="before")
     @classmethod
     def require_non_empty_text(cls, value):
         if not isinstance(value, str) or not value.strip():
             raise ValueError("must be a non-empty string")
+        return value.strip()
+
+    @field_validator("address", mode="before")
+    @classmethod
+    def normalize_optional_address(cls, value):
+        if value is None:
+            return ""
+        if not isinstance(value, str):
+            raise ValueError("must be a string")
         return value.strip()
 
 
@@ -130,6 +142,9 @@ def serialize_place(place: DBPlace) -> dict:
         "category": place.category,
         "rating": place.rating,
         "summary": place.summary,
+        "latitude": place.latitude,
+        "longitude": place.longitude,
+        "geocoding_status": place.geocoding_status,
     }
 
 
@@ -138,9 +153,10 @@ async def extract_place_info(text: str):
         return None
     prompt = (
         "당신은 한국 맛집/장소 텍스트에서 장소 정보를 추출하는 AI입니다. "
-        "사용자가 복사해 붙여넣은 텍스트에서 상호명과 주소만 JSON 배열로 추출하세요. "
+        "사용자가 복사해 붙여넣은 텍스트에서 상호명과 주소를 JSON 배열로 추출하세요. "
+        "주소가 명확히 없더라도 상호명이 있으면 포함하고 address는 빈 문자열로 두세요. "
         "반드시 다른 설명 없이 JSON 배열만 반환하세요. "
-        '형식: [{"name":"상호명","address":"주소"}]. '
+        '형식: [{"name":"상호명","address":"주소 또는 빈 문자열"}]. '
         f"텍스트: {text}"
     )
     try:
@@ -212,6 +228,9 @@ async def create_place_api(
         category=place.category,
         rating=place.rating,
         summary=place.summary,
+        latitude=place.latitude,
+        longitude=place.longitude,
+        geocoding_status=place.geocoding_status,
     )
     db.add(db_place)
     await db.commit()
@@ -232,6 +251,38 @@ async def list_places_api(
     )
     places = [serialize_place(place) for place in result.scalars().all()]
     return JSONResponse(content={"status": "success", "data": places})
+
+
+@app.patch("/api/places/{place_id}")
+async def update_place_api(
+    place_id: int,
+    place: PlaceItem,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(verify_internal_api_key),
+):
+    result = await db.execute(
+        select(DBPlace).where(
+            DBPlace.id == place_id,
+            DBPlace.user_id == place.user_id,
+        )
+    )
+    db_place = result.scalar_one_or_none()
+
+    if not db_place:
+        raise HTTPException(status_code=404, detail={"code": "PLACE_NOT_FOUND"})
+
+    db_place.name = place.name
+    db_place.address = place.address
+    db_place.category = place.category
+    db_place.rating = place.rating
+    db_place.summary = place.summary
+    db_place.latitude = place.latitude
+    db_place.longitude = place.longitude
+    db_place.geocoding_status = place.geocoding_status
+
+    await db.commit()
+    await db.refresh(db_place)
+    return JSONResponse(content={"status": "success", "data": serialize_place(db_place)})
 
 if __name__ == "__main__":
     import uvicorn

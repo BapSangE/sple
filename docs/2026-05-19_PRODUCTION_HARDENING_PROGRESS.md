@@ -278,6 +278,37 @@ https://sple-insta.com/api/auth/callback/google
 - Frontend type check: passed.
 - Frontend production build: passed.
 
+## 2026-05-19 Address Optional Follow-Up
+
+증상:
+
+- 주소가 없는 Instagram 글에서 `장소명과 주소를 함께 찾지 못했어요. 주소가 포함된 텍스트로 다시 시도해 주세요.`가 표시됐다.
+- 예시 글은 `덮밥장사장`이라는 매장명은 있지만 정확한 주소는 없었다.
+
+판단:
+
+- 실제 Instagram 맛집 콘텐츠에는 지점명 또는 브랜드명만 있고 주소가 없는 경우가 많다.
+- 텍스트 복사 붙여넣기 MVP에서는 주소가 없어도 장소 후보로 저장할 수 있어야 한다.
+- 다만 주소가 없는 장소는 지도 마커/네이버 지도 바로가기를 제한해야 한다.
+
+조치:
+
+- AI 프롬프트를 수정해 주소가 없어도 상호명이 있으면 `address: ""`로 반환하도록 했다.
+- `/add` 결과 정규화 기준을 `name` 필수, `address` optional로 변경했다.
+- 저장 API route도 `name`만 필수로 변경했다.
+- 백엔드 `PlaceItem.address` 기본값을 빈 문자열로 변경했다.
+- 리스트 화면에서 주소가 없으면 `주소 정보 없음`을 표시하고 네이버 지도 버튼을 비활성화한다.
+- Supabase migration `migrations/2026-05-19_places_address_optional.sql`을 추가했다.
+
+사용자 확인:
+
+1. Supabase SQL Editor에서 `migrations/2026-05-19_places_address_optional.sql`을 실행한다.
+2. 백엔드와 프론트를 배포한다.
+3. 주소 없는 예시 글로 분석한다.
+4. `덮밥장사장`이 결과 후보로 표시되는지 확인한다.
+5. 저장 후 `/saved`에서 `덮밥장사장`과 `주소 정보 없음`이 보이는지 확인한다.
+6. 주소 없는 장소의 네이버 지도 버튼이 비활성화되어 있는지 확인한다.
+
 ### P1
 
 - 주소 geocoding 추가 후 지도에 저장 장소 마커 표시.
@@ -290,3 +321,80 @@ https://sple-insta.com/api/auth/callback/google
 - alert 기반 저장 UX를 toast 또는 화면 상태로 변경.
 - 비로그인 저장 클릭 시 profile 이동 또는 로그인 CTA 표시.
 - 카테고리 필터를 실제 저장 데이터와 맞게 재설계.
+
+## 2026-05-19 Branch Selection Follow-Up
+
+목표:
+
+- 주소 없는 장소는 지도에 바로 마커를 찍지 않는다.
+- 대신 사용자가 지점을 찾아 주소를 확정하면 이후 지도 마커 대상으로 삼을 수 있게 한다.
+
+현재 구현:
+
+- `/saved` 상세 바텀시트에 주소 입력 영역을 추가했다.
+- 주소 없는 장소는 `주소 정보 없음`으로 표시된다.
+- `지점 찾기` 버튼은 네이버 지도에서 장소명으로 검색을 연다.
+- 사용자는 네이버 지도에서 맞는 지점을 확인한 뒤 주소를 앱의 주소 입력칸에 붙여넣을 수 있다.
+- `주소 저장`을 누르면 `PATCH /api/places`를 통해 저장된 장소의 주소가 업데이트된다.
+- 주소 저장 시 Naver Maps JavaScript `geocoder` submodule로 주소를 위도/경도로 변환한다.
+- geocoding에 성공하면 `latitude`, `longitude`, `geocoding_status=resolved`가 함께 저장된다.
+- geocoding에 실패해도 주소 자체는 저장하고 `geocoding_status=failed`로 남긴다.
+- 주소가 저장되면 `네이버 지도로 확인하기` 버튼이 활성화된다.
+
+지도 마커 구현:
+
+- `places` 테이블에 `latitude`, `longitude`, `geocoding_status`를 추가하는 migration을 만들었다.
+- `/` 지도에서 좌표가 있는 저장 장소만 네이버 지도 마커로 표시한다.
+- 좌표가 있는 저장 장소가 있으면 첫 번째 장소를 중심으로 지도를 이동한다.
+- 주소가 없는 장소는 지도에는 표시하지 않고 `/saved`에서 `주소 정보 없음` 상태로 관리.
+
+추가 Supabase migration:
+
+```sql
+-- migrations/2026-05-19_places_geocoding_fields.sql
+begin;
+
+alter table public.places
+  add column if not exists latitude double precision,
+  add column if not exists longitude double precision,
+  add column if not exists geocoding_status text default 'pending';
+
+update public.places
+set geocoding_status = case
+  when latitude is not null and longitude is not null then 'resolved'
+  when address is null or trim(address) = '' then 'pending'
+  else coalesce(geocoding_status, 'pending')
+end
+where geocoding_status is null;
+
+create index if not exists ix_places_user_id_geocoding_status
+  on public.places (user_id, geocoding_status);
+
+commit;
+```
+
+Naver 확인 필요:
+
+- Vercel `NEXT_PUBLIC_NAVER_CLIENT_ID`는 이미 설정되어 있어야 한다.
+- Naver Cloud Platform에서 Maps JavaScript API와 Geocoding 사용 권한이 열려 있어야 한다.
+- 서비스 도메인 `https://www.sple-insta.com`, `https://sple-insta.com`이 허용 도메인에 포함되어 있어야 한다.
+
+사용자 확인:
+
+1. Supabase SQL Editor에서 `migrations/2026-05-19_places_address_optional.sql`을 먼저 실행한다.
+2. 이어서 `migrations/2026-05-19_places_geocoding_fields.sql`을 실행한다.
+3. GitHub에 push해 Vercel frontend와 AWS backend가 모두 재배포되게 한다.
+4. 주소 없는 글로 `덮밥장사장`을 저장한다.
+5. `/saved`에서 `덮밥장사장` 상세를 연다.
+6. `지점 찾기`를 눌러 네이버 지도 검색이 열리는지 확인한다.
+7. 맞는 지점의 주소를 복사해 앱의 주소 입력칸에 붙여넣는다.
+8. `주소 저장`을 누른다.
+9. 상세 화면과 리스트에 저장된 주소가 반영되는지 확인한다.
+10. 하단 `지도` 탭으로 이동해 마커가 표시되는지 확인한다.
+
+검증:
+
+- Frontend lint: passed.
+- Frontend type check: passed.
+- Frontend production build: passed.
+- Backend pytest는 현재 로컬 Windows 환경에서 Python 명령이 없고 `uv`의 `.venv` Python 링크가 깨져 실행하지 못했다. CI 또는 Python 런타임 복구 후 `uv run pytest tests/test_places_api.py -q`로 확인 필요.

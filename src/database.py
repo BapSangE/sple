@@ -29,10 +29,13 @@ class Place(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[str] = mapped_column(String, index=True) # Google Auth user ID
     name: Mapped[str] = mapped_column(String)
-    address: Mapped[str] = mapped_column(String)
+    address: Mapped[str] = mapped_column(String, default="")
     category: Mapped[str] = mapped_column(String, default="All")
     rating: Mapped[float] = mapped_column(Float, nullable=True)
     summary: Mapped[str] = mapped_column(Text, nullable=True)
+    latitude: Mapped[float] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float] = mapped_column(Float, nullable=True)
+    geocoding_status: Mapped[str] = mapped_column(String, default="pending")
 
 async def init_db():
     async with engine.begin() as conn:
