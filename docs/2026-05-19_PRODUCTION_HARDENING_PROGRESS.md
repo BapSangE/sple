@@ -398,3 +398,35 @@ Naver 확인 필요:
 - Frontend type check: passed.
 - Frontend production build: passed.
 - Backend pytest는 현재 로컬 Windows 환경에서 Python 명령이 없고 `uv`의 `.venv` Python 링크가 깨져 실행하지 못했다. CI 또는 Python 런타임 복구 후 `uv run pytest tests/test_places_api.py -q`로 확인 필요.
+
+## 2026-05-19 Map Marker and Multi-Place Save Follow-Up
+
+증상:
+
+- 분석 결과가 여러 장소일 때 하단 저장 버튼이 보이지 않거나 접근하기 어려웠다.
+- `/add`에서 주소가 있는 장소를 저장해도 지도 마커가 보이지 않았다.
+- 지도 초기 위치가 사용자 현재 위치가 아니라 고정된 서울시청 좌표였다.
+
+원인:
+
+- `/add` 저장 흐름은 `name`, `address`만 저장하고 `latitude`, `longitude`를 채우지 않았다. 지도는 좌표가 있는 장소만 마커로 표시하므로 저장 직후 마커가 보이지 않았다.
+- 결과 화면의 장소 리스트, 광고, 저장 버튼이 한 세로 흐름에 묶여 작은 화면에서 저장 버튼의 고정성이 약했다.
+- 지도 컴포넌트가 `navigator.geolocation`을 사용하지 않고 기본 좌표로만 초기화했다.
+
+조치:
+
+- Naver geocoding 공통 유틸 `frontend/src/lib/naver-geocoding.ts`를 추가했다.
+- `/add`에서 주소가 있는 장소를 저장할 때 Naver geocoding을 먼저 실행하고 좌표와 `geocoding_status`를 함께 저장한다.
+- 주소가 없는 장소는 좌표 없이 `geocoding_status=pending`으로 저장한다.
+- `/saved` 주소 수정 기능도 같은 geocoding 유틸을 사용하도록 중복 로직을 정리했다.
+- 지도 화면에서는 기존 저장 데이터 중 주소는 있지만 좌표가 없는 장소도 임시 geocoding 후 마커로 표시한다.
+- `/add` 결과 화면은 `min-h-0` 스크롤 영역과 별도 하단 저장 영역으로 나눠 여러 장소가 있어도 저장 버튼이 항상 남도록 조정했다.
+- 지도는 브라우저 현재 위치 권한이 허용되면 현재 위치를 중심으로 열고 현재 위치 마커를 표시한다. 권한 거부 또는 실패 시 기존 기본 위치를 사용한다.
+
+검증:
+
+- Naver geocoding 유틸 테스트: passed.
+- Frontend lint: passed.
+- Frontend type check: passed.
+- Frontend production build: passed.
+- Local browser `/add`, `/` render check: passed with no console errors.

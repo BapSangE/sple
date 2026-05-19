@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { apiUrl } from "@/lib/api";
+import { geocodeAddress } from "@/lib/naver-geocoding";
 
 interface MapPlace {
   id: number;
@@ -15,6 +16,11 @@ interface MapPlace {
 interface PlacesResponse {
   status: string;
   data?: MapPlace[];
+}
+
+interface UserLocation {
+  latitude: number;
+  longitude: number;
 }
 
 type NaverLatLng = object;
@@ -36,6 +42,11 @@ type NaverWindow = Window & {
   };
 };
 
+const SEOUL_CITY_HALL: UserLocation = {
+  latitude: 37.5666805,
+  longitude: 126.9784147,
+};
+
 function getNaverMaps() {
   return (window as NaverWindow).naver?.maps;
 }
@@ -48,11 +59,32 @@ export default function Map() {
   const { status } = useSession();
   const mapElement = useRef<HTMLDivElement>(null);
   const [places, setPlaces] = useState<MapPlace[]>([]);
+  const [resolvedPlaces, setResolvedPlaces] = useState<MapPlace[]>([]);
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
 
   useEffect(() => {
-    if (status !== "authenticated") {
-      return;
-    }
+    if (!navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+      },
+      (error) => {
+        console.info("Current location is unavailable:", error.message);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 60_000,
+        timeout: 5_000,
+      },
+    );
+  }, []);
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
 
     fetch(apiUrl("/api/places"))
       .then((response) => response.json())
@@ -67,22 +99,60 @@ export default function Map() {
   }, [status]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function resolveAddressOnlyPlaces() {
+      const nextPlaces = await Promise.all(
+        places.map(async (place) => {
+          if (hasCoordinates(place) || !place.address) return place;
+
+          const coordinates = await geocodeAddress(place.address);
+          if (!coordinates) return place;
+
+          return {
+            ...place,
+            ...coordinates,
+          };
+        }),
+      );
+
+      if (!cancelled) {
+        setResolvedPlaces(nextPlaces);
+      }
+    }
+
+    resolveAddressOnlyPlaces();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [places]);
+
+  useEffect(() => {
     const initMap = () => {
       const maps = getNaverMaps();
       if (!mapElement.current || !maps) return;
 
-      const defaultLocation = new maps.LatLng(37.5666805, 126.9784147);
+      const visiblePlaces = status === "authenticated" ? resolvedPlaces : [];
+      const markerPlaces = visiblePlaces.filter(hasCoordinates);
+      const centerLocation = userLocation || SEOUL_CITY_HALL;
+
       const map = new maps.Map(mapElement.current, {
-        center: defaultLocation,
-        zoom: 15,
+        center: new maps.LatLng(centerLocation.latitude, centerLocation.longitude),
+        zoom: userLocation ? 14 : 15,
         minZoom: 10,
         scaleControl: false,
         mapDataControl: false,
         zoomControl: false,
       });
 
-      const visiblePlaces = status === "authenticated" ? places : [];
-      const markerPlaces = visiblePlaces.filter(hasCoordinates);
+      if (userLocation) {
+        new maps.Marker({
+          position: new maps.LatLng(userLocation.latitude, userLocation.longitude),
+          map,
+          title: "현재 위치",
+        });
+      }
 
       markerPlaces.forEach((place) => {
         const markerPosition = new maps.LatLng(place.latitude as number, place.longitude as number);
@@ -93,8 +163,8 @@ export default function Map() {
         });
       });
 
-      const firstPlace = markerPlaces[0];
-      if (firstPlace) {
+      if (!userLocation && markerPlaces.length > 0) {
+        const firstPlace = markerPlaces[0];
         map.setCenter(new maps.LatLng(firstPlace.latitude as number, firstPlace.longitude as number));
         map.setZoom(13);
       }
@@ -113,7 +183,7 @@ export default function Map() {
     }, 100);
 
     return () => window.clearInterval(timer);
-  }, [places, status]);
+  }, [resolvedPlaces, status, userLocation]);
 
   return <div ref={mapElement} className="h-full w-full bg-[#E5E2E1]" />;
 }

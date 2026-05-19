@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, MapPin, X } from "lucide-react";
 import { apiUrl } from "@/lib/api";
+import { geocodeAddress, geocodingFieldsFromCoordinates } from "@/lib/naver-geocoding";
 
 interface SavedPlace {
   id: number;
@@ -23,37 +24,6 @@ interface PlacesResponse {
   data?: SavedPlace[];
   message?: string;
 }
-
-interface NaverGeocodeItem {
-  point?: {
-    x?: number;
-    y?: number;
-  };
-}
-
-interface NaverGeocodeResponse {
-  result?: {
-    items?: NaverGeocodeItem[];
-  };
-}
-
-interface NaverGeocoderService {
-  Status: {
-    OK: string;
-  };
-  geocode: (
-    options: { address: string },
-    callback: (status: string, response: NaverGeocodeResponse) => void,
-  ) => void;
-}
-
-type NaverGeocoderWindow = Window & {
-  naver?: {
-    maps?: {
-      Service?: NaverGeocoderService;
-    };
-  };
-};
 
 const CATEGORIES = ['All', 'Cafe', 'Dining', 'Bar'];
 
@@ -123,31 +93,6 @@ export default function SavedPage() {
     window.open(`https://m.map.naver.com/search2/search.naver?query=${query}`, "_blank");
   };
 
-  const geocodeAddress = (address: string) =>
-    new Promise<{ latitude: number; longitude: number } | null>((resolve) => {
-      const service = (window as NaverGeocoderWindow).naver?.maps?.Service;
-
-      if (!service) {
-        resolve(null);
-        return;
-      }
-
-      service.geocode({ address }, (status, response) => {
-        if (status !== service.Status.OK) {
-          resolve(null);
-          return;
-        }
-
-        const point = response.result?.items?.[0]?.point;
-        if (typeof point?.y !== "number" || typeof point.x !== "number") {
-          resolve(null);
-          return;
-        }
-
-        resolve({ latitude: point.y, longitude: point.x });
-      });
-    });
-
   const openPlaceDetail = (place: SavedPlace) => {
     setSelectedPlace(place);
     setAddressDraft(place.address || "");
@@ -174,6 +119,7 @@ export default function SavedPage() {
 
     try {
       const coordinates = await geocodeAddress(nextAddress);
+      const geocodingFields = geocodingFieldsFromCoordinates(coordinates);
       const response = await fetch(apiUrl("/api/places"), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -184,9 +130,7 @@ export default function SavedPage() {
           category: selectedPlace.category,
           rating: selectedPlace.rating,
           summary: selectedPlace.summary,
-          latitude: coordinates?.latitude ?? null,
-          longitude: coordinates?.longitude ?? null,
-          geocoding_status: coordinates ? "resolved" : "failed",
+          ...geocodingFields,
         }),
       });
 
