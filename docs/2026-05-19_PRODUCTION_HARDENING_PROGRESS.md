@@ -51,6 +51,35 @@ https://api.sple-insta.com/health/db
 {"status":"ok","database":"reachable"}
 ```
 
+GitHub Actions IAM 권한:
+
+`Align ALB listener to running ECS task target group` 단계는 기존 ECS/ECR 권한 외에 아래 권한이 필요하다.
+이 권한이 없으면 AWS CLI가 `exit code 254`로 실패할 수 있다.
+
+```json
+{
+  "Effect": "Allow",
+  "Action": [
+    "sts:GetCallerIdentity",
+    "ecs:ListTasks",
+    "ecs:DescribeTasks",
+    "elasticloadbalancing:DescribeTargetGroups",
+    "elasticloadbalancing:DescribeTargetHealth",
+    "elasticloadbalancing:DescribeListeners",
+    "elasticloadbalancing:ModifyListener"
+  ],
+  "Resource": "*"
+}
+```
+
+확인 위치:
+
+1. AWS Console 접속.
+2. IAM으로 이동.
+3. GitHub Actions에서 쓰는 `AWS_ACCESS_KEY_ID`의 IAM User 또는 Role을 찾는다.
+4. 위 권한이 포함된 policy를 추가한다.
+5. 다시 GitHub Actions를 재실행한다.
+
 ### 2. 분석 API 오류 처리 보강
 
 문제:

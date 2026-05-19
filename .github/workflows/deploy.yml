@@ -89,6 +89,11 @@ jobs:
         run: |
           set -euo pipefail
 
+          echo "Checking AWS caller identity used by GitHub Actions..."
+          aws sts get-caller-identity
+
+          echo "Resolving the currently running ECS task..."
+
           TASK_ARN=$(aws ecs list-tasks \
             --cluster "$ECS_CLUSTER" \
             --service-name "$ECS_SERVICE" \
@@ -114,13 +119,21 @@ jobs:
 
           echo "Running ECS task IP: $TASK_IP"
 
+          echo "Listing target groups attached to the backend ALB..."
           TARGET_GROUPS=$(aws elbv2 describe-target-groups \
             --load-balancer-arn "$ALB_ARN" \
             --query 'TargetGroups[].TargetGroupArn' \
             --output text)
 
+          if [ -z "$TARGET_GROUPS" ] || [ "$TARGET_GROUPS" = "None" ]; then
+            echo "No target groups found for ALB $ALB_ARN."
+            echo "Check that the GitHub Actions AWS credentials allow elasticloadbalancing:DescribeTargetGroups."
+            exit 1
+          fi
+
           ACTIVE_TG=""
           for TG in $TARGET_GROUPS; do
+            echo "Checking target group $TG..."
             MATCHING_STATE=$(aws elbv2 describe-target-health \
               --target-group-arn "$TG" \
               --query "TargetHealthDescriptions[?Target.Id=='$TASK_IP'].TargetHealth.State | [0]" \
@@ -148,9 +161,12 @@ jobs:
           echo "Active task target group: $ACTIVE_TG"
 
           if [ "$CURRENT_TG" != "$ACTIVE_TG" ]; then
+            echo "Updating listener to the active target group..."
             aws elbv2 modify-listener \
               --listener-arn "$ALB_HTTPS_LISTENER_ARN" \
               --default-actions Type=forward,TargetGroupArn="$ACTIVE_TG"
+          else
+            echo "ALB listener already points to the active target group."
           fi
 
       - name: Smoke test backend health endpoint
