@@ -18,7 +18,7 @@ interface Place {
 
 interface AnalyzeResponse {
   status: string;
-  data?: Array<Pick<Place, "name" | "address">> | null;
+  data?: Array<Partial<Pick<Place, "name" | "address">>> | null;
   message?: string;
 }
 
@@ -38,6 +38,17 @@ async function readErrorMessage(response: Response) {
   } catch {
     return "장소 저장에 실패했습니다.";
   }
+}
+
+function normalizePlace(place: Partial<Pick<Place, "name" | "address">>): Place | null {
+  const name = place.name?.trim();
+  const address = place.address?.trim();
+
+  if (!name || !address) {
+    return null;
+  }
+
+  return { name, address, selected: true };
 }
 
 export default function AddPage() {
@@ -71,10 +82,17 @@ export default function AddPage() {
       }
       
       if (data.status === "success" && data.data && data.data.length > 0) {
-        // 모든 가게를 기본적으로 선택된 상태로 설정
-        const extractedPlaces = data.data.map((place) => ({ ...place, selected: true }));
-        setPlaces(extractedPlaces);
-        setStep("result");
+        const extractedPlaces = data.data
+          .map(normalizePlace)
+          .filter((place): place is Place => place !== null);
+
+        if (extractedPlaces.length > 0) {
+          setPlaces(extractedPlaces);
+          setStep("result");
+        } else {
+          setError("장소명과 주소를 함께 찾지 못했어요. 주소가 포함된 텍스트로 다시 시도해 주세요.");
+          setStep("input");
+        }
       } else {
         setError("앗! 장소 정보를 찾지 못했어요. 상호명이 본문에 적힌 다른 링크로 시도해 주세요! 📍");
         setStep("input");
@@ -100,9 +118,13 @@ export default function AddPage() {
   };
 
   const handleSave = async () => {
-    const selectedPlaces = places.filter(p => p.selected);
+    const selectedPlaces = places
+      .filter(p => p.selected)
+      .map(normalizePlace)
+      .filter((place): place is Place => place !== null);
+
     if (selectedPlaces.length === 0) {
-      alert("최소 한 개의 장소를 선택해주세요.");
+      alert("저장할 수 있는 장소가 없습니다. 장소명과 주소가 함께 있는 결과를 선택해주세요.");
       return;
     }
 

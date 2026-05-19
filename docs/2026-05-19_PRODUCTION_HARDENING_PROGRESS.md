@@ -218,6 +218,32 @@ https://sple-insta.com/api/auth/callback/google
 - GitHub Actions 재배포 후 ALB listener 자동 보정이 재발 없이 동작하는지 확인.
 - Supabase 운영 `places` 스키마 최종 상태 확인.
 
+## 2026-05-19 Save Validation Follow-Up
+
+증상:
+
+- 로그인 후 저장 시 `POST https://sple-insta.com/api/places`가 400을 반환했다.
+- 브라우저 콘솔에는 `장소명과 주소가 필요합니다.`가 표시됐다.
+
+의미:
+
+- Google 로그인과 Vercel API route까지는 도달했다.
+- 백엔드 연결 문제가 아니라 저장 요청 payload의 `name` 또는 `address`가 비어 있었다.
+
+조치:
+
+- `/add` 분석 결과를 화면에 올리기 전에 `name`, `address`를 trim하고 둘 중 하나라도 비어 있으면 제외하도록 했다.
+- 저장 직전에도 선택된 장소를 다시 normalize해서 빈 장소를 저장 요청에서 제외하도록 했다.
+- 저장 가능한 장소가 없으면 서버 요청을 보내지 않고 사용자에게 안내하도록 했다.
+- 백엔드 `PlaceItem`에도 `user_id`, `name`, `address` 공백 문자열 검증을 추가했다.
+
+검증:
+
+- Frontend lint: passed.
+- Frontend type check: passed.
+- Frontend production build: passed.
+- Backend pytest는 현재 Windows 로컬 `uv` Python 실행 문제로 실행하지 못했다. CI Ubuntu 환경에서 확인 필요.
+
 ### P1
 
 - 주소 geocoding 추가 후 지도에 저장 장소 마커 표시.

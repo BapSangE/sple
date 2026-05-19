@@ -2,7 +2,7 @@
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 import os
 import logging
 from dotenv import load_dotenv
@@ -112,6 +112,13 @@ class PlaceItem(BaseModel):
     category: str = "All"
     rating: Optional[float] = None
     summary: Optional[str] = None
+
+    @field_validator("user_id", "name", "address", mode="before")
+    @classmethod
+    def require_non_empty_text(cls, value):
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("must be a non-empty string")
+        return value.strip()
 
 
 def serialize_place(place: DBPlace) -> dict:
