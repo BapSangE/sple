@@ -173,6 +173,26 @@ jobs:
         env:
           BACKEND_HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
         run: |
+          set -euo pipefail
+
           HEALTH_URL="${BACKEND_HEALTH_URL:-https://api.sple-insta.com}"
-          curl --fail --silent --show-error "$HEALTH_URL/health"
-          curl --fail --silent --show-error "$HEALTH_URL/health/db"
+
+          for path in /health /health/db; do
+            echo "Checking $HEALTH_URL$path"
+
+            for attempt in $(seq 1 12); do
+              if curl --fail --silent --show-error "$HEALTH_URL$path"; then
+                echo
+                echo "$path passed on attempt $attempt."
+                break
+              fi
+
+              if [ "$attempt" -eq 12 ]; then
+                echo "$path did not become healthy after $attempt attempts."
+                exit 1
+              fi
+
+              echo "$path is not ready yet. Retrying in 10 seconds..."
+              sleep 10
+            done
+          done
