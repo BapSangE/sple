@@ -9,6 +9,13 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      AWS_REGION: ap-northeast-2
+      ECS_CLUSTER: default
+      ECS_SERVICE: sple-backend-6440
+      ECS_TASK_DEFINITION: default-sple-backend-6440
+      ECR_REPOSITORY: sple-backend
+      ALB_ARN: arn:aws:elasticloadbalancing:ap-northeast-2:740204038663:loadbalancer/app/ecs-express-gateway-alb-75822530/3347066d172cabd1
+      ALB_HTTPS_LISTENER_ARN: arn:aws:elasticloadbalancing:ap-northeast-2:740204038663:listener/app/ecs-express-gateway-alb-75822530/3347066d172cabd1/50ec79dc8797e0c1
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,7 +39,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-northeast-2
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -41,16 +48,16 @@ jobs:
       - name: Build and Push Docker image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: sple-backend
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }} -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
       # --- 인프라 환경 변수 반영 로직 ---
 
       - name: Download current Task Definition
         run: |
-          aws ecs describe-task-definition --task-definition default-sple-backend-6440 --query taskDefinition | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy, .enableFaultInjection)' > task-definition.json
+          aws ecs describe-task-definition --task-definition "$ECS_TASK_DEFINITION" --query taskDefinition | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy, .enableFaultInjection)' > task-definition.json
 
       # 2. 작업 정의 업데이트
       - name: Fill in the new image ID and Environment Variables in the Amazon ECS task definition
@@ -59,7 +66,7 @@ jobs:
         with:
           task-definition: task-definition.json
           container-name: Main
-          image: ${{ steps.login-ecr.outputs.registry }}/sple-backend:latest
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
           environment-variables: |
             DATABASE_URL=${{ secrets.DATABASE_URL }}
             GCP_SA_KEY_JSON=${{ secrets.GCP_SA_KEY_JSON }}
@@ -74,9 +81,77 @@ jobs:
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
           task-definition: ${{ steps.task-def.outputs.task-definition }}
-          service: sple-backend-6440
-          cluster: default
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
+
+      - name: Align ALB listener to running ECS task target group
+        run: |
+          set -euo pipefail
+
+          TASK_ARN=$(aws ecs list-tasks \
+            --cluster "$ECS_CLUSTER" \
+            --service-name "$ECS_SERVICE" \
+            --desired-status RUNNING \
+            --query 'taskArns[0]' \
+            --output text)
+
+          if [ "$TASK_ARN" = "None" ] || [ -z "$TASK_ARN" ]; then
+            echo "No running ECS task found for $ECS_SERVICE."
+            exit 1
+          fi
+
+          TASK_IP=$(aws ecs describe-tasks \
+            --cluster "$ECS_CLUSTER" \
+            --tasks "$TASK_ARN" \
+            --query "tasks[0].attachments[0].details[?name=='privateIPv4Address'].value | [0]" \
+            --output text)
+
+          if [ "$TASK_IP" = "None" ] || [ -z "$TASK_IP" ]; then
+            echo "Could not resolve private IP for task $TASK_ARN."
+            exit 1
+          fi
+
+          echo "Running ECS task IP: $TASK_IP"
+
+          TARGET_GROUPS=$(aws elbv2 describe-target-groups \
+            --load-balancer-arn "$ALB_ARN" \
+            --query 'TargetGroups[].TargetGroupArn' \
+            --output text)
+
+          ACTIVE_TG=""
+          for TG in $TARGET_GROUPS; do
+            MATCHING_STATE=$(aws elbv2 describe-target-health \
+              --target-group-arn "$TG" \
+              --query "TargetHealthDescriptions[?Target.Id=='$TASK_IP'].TargetHealth.State | [0]" \
+              --output text)
+
+            echo "$TG -> task target state: $MATCHING_STATE"
+
+            if [ "$MATCHING_STATE" = "healthy" ]; then
+              ACTIVE_TG="$TG"
+              break
+            fi
+          done
+
+          if [ -z "$ACTIVE_TG" ]; then
+            echo "No healthy target group contains the running ECS task IP $TASK_IP."
+            exit 1
+          fi
+
+          CURRENT_TG=$(aws elbv2 describe-listeners \
+            --listener-arns "$ALB_HTTPS_LISTENER_ARN" \
+            --query 'Listeners[0].DefaultActions[0].TargetGroupArn' \
+            --output text)
+
+          echo "Current listener target group: $CURRENT_TG"
+          echo "Active task target group: $ACTIVE_TG"
+
+          if [ "$CURRENT_TG" != "$ACTIVE_TG" ]; then
+            aws elbv2 modify-listener \
+              --listener-arn "$ALB_HTTPS_LISTENER_ARN" \
+              --default-actions Type=forward,TargetGroupArn="$ACTIVE_TG"
+          fi
 
       - name: Smoke test backend health endpoint
         env:

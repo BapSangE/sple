@@ -15,8 +15,8 @@ export default function DataDeletionPage() {
           <p className="text-sm leading-7">
             Sple 사용자는 서비스 이용 중 저장된 개인정보와 장소 데이터를 삭제
             요청할 수 있습니다. 삭제 대상에는 Google 로그인 계정 식별 정보,
-            저장된 장소 목록, 사용자가 붙여넣은 텍스트 또는 Sple Instagram
-            계정으로 보낸 DM 분석 기록이 포함될 수 있습니다.
+            저장된 장소 목록, 사용자가 붙여넣은 텍스트의 분석 기록이 포함될 수
+            있습니다.
           </p>
         </section>
 
@@ -24,8 +24,7 @@ export default function DataDeletionPage() {
           <h2 className="text-lg font-bold">삭제 요청 방법</h2>
           <p className="text-sm leading-7">
             아래 이메일로 데이터 삭제 요청을 보내주세요. 요청을 확인하기 위해
-            Sple에 로그인한 이메일 주소 또는 Instagram 메시지를 보낸 계정 정보를
-            함께 알려주시면 처리에 도움이 됩니다.
+            Sple에 로그인한 이메일 주소를 함께 알려주시면 처리에 도움이 됩니다.
           </p>
           <a
             className="text-sm font-semibold text-primary underline underline-offset-4"
@@ -45,12 +44,11 @@ export default function DataDeletionPage() {
         </section>
 
         <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-bold">Meta 또는 Instagram 연결 해제</h2>
+          <h2 className="text-lg font-bold">Google 계정 연결 해제</h2>
           <p className="text-sm leading-7">
-            Meta 또는 Instagram 계정 연결을 해제하려면 Meta 계정의 앱 및 웹사이트
-            설정에서 Sple 앱의 접근 권한을 제거할 수 있습니다. 연결 해제 후에도
-            Sple에 이미 저장된 데이터 삭제를 원하면 위 이메일로 별도 요청해
-            주세요.
+            Google 계정의 보안 또는 앱 연결 설정에서 Sple의 접근 권한을 제거할
+            수 있습니다. 연결 해제 후에도 Sple에 이미 저장된 데이터 삭제를
+            원하면 위 이메일로 별도 요청해 주세요.
           </p>
         </section>
       </article>
