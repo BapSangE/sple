@@ -11,12 +11,20 @@ export interface PlaceGeocodingFields {
 
 export interface NaverGeocodeItem {
   point?: {
-    x?: number;
-    y?: number;
+    x?: number | string;
+    y?: number | string;
   };
 }
 
+export interface NaverGeocodeAddressV2 {
+  x?: number | string;
+  y?: number | string;
+}
+
 export interface NaverGeocodeResponse {
+  v2?: {
+    addresses?: NaverGeocodeAddressV2[];
+  };
   result?: {
     items?: NaverGeocodeItem[];
   };
@@ -27,7 +35,7 @@ export interface NaverGeocoderService {
     OK: string;
   };
   geocode: (
-    options: { address: string },
+    options: { query: string },
     callback: (status: string, response: NaverGeocodeResponse) => void,
   ) => void;
 }
@@ -40,19 +48,47 @@ type NaverGeocoderWindow = Window & {
   };
 };
 
+function toCoordinate(value: number | string | undefined) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+export function createNaverGeocodeOptions(address: string) {
+  return {
+    query: address.trim(),
+  };
+}
+
 export function parseNaverGeocodeCoordinates(
   response: NaverGeocodeResponse,
 ): PlaceCoordinates | null {
-  const point = response.result?.items?.[0]?.point;
+  const v2Address = response.v2?.addresses?.[0];
+  const v2Longitude = toCoordinate(v2Address?.x);
+  const v2Latitude = toCoordinate(v2Address?.y);
 
-  if (typeof point?.y !== "number" || typeof point.x !== "number") {
-    return null;
+  if (v2Latitude !== null && v2Longitude !== null) {
+    return {
+      latitude: v2Latitude,
+      longitude: v2Longitude,
+    };
   }
 
-  return {
-    latitude: point.y,
-    longitude: point.x,
-  };
+  const legacyPoint = response.result?.items?.[0]?.point;
+  const legacyLongitude = toCoordinate(legacyPoint?.x);
+  const legacyLatitude = toCoordinate(legacyPoint?.y);
+
+  if (legacyLatitude !== null && legacyLongitude !== null) {
+    return {
+      latitude: legacyLatitude,
+      longitude: legacyLongitude,
+    };
+  }
+
+  return null;
 }
 
 export function geocodingFieldsFromCoordinates(
@@ -118,20 +154,16 @@ export async function geocodeAddress(address: string) {
   const service = await waitForNaverGeocoder();
   if (!service) {
     console.error(
-      "[Sple Naver Geocoder API] 네이버 지도 Geocoder 서비스를 불러오지 못했습니다.\n" +
-      "1. layout.tsx에 네이버 지도 스크립트 로드 시 '&submodules=geocoder' 옵션이 제대로 붙어 있는지 확인해 주세요.\n" +
-      "2. 환경 변수 NEXT_PUBLIC_NAVER_CLIENT_ID가 정확하게 정의되어 있는지 확인해 주세요.\n" +
-      "3. 네이버 클라우드 플랫폼(NCP) 콘솔에 현재 접속 중인 도메인(Web 서비스 URL)이 정확히 등록되어 있는지 확인해 주세요."
+      "[Sple Naver Geocoder] Geocoder service was not loaded. Check NEXT_PUBLIC_NAVER_CLIENT_ID, allowed domains, and the geocoder submodule.",
     );
     return null;
   }
 
   return new Promise<PlaceCoordinates | null>((resolve) => {
-    service.geocode({ address: trimmedAddress }, (status, response) => {
+    service.geocode(createNaverGeocodeOptions(trimmedAddress), (status, response) => {
       if (status !== service.Status.OK) {
         console.warn(
-          `[Sple Naver Geocoder API] 주소 지오코딩 실패 (주소: "${trimmedAddress}", 응답 상태: "${status}").\n` +
-          "네이버 클라우드 플랫폼 콘솔의 AI·NAVER API -> Application 설정에서 'Geocoding' 서비스 사용 권한이 활성화되어 있는지 확인해 주세요."
+          `[Sple Naver Geocoder] Geocoding failed. address="${trimmedAddress}", status="${status}"`,
         );
         resolve(null);
         return;
@@ -139,7 +171,10 @@ export async function geocodeAddress(address: string) {
 
       const coordinates = parseNaverGeocodeCoordinates(response);
       if (!coordinates) {
-        console.warn(`[Sple Naver Geocoder API] 주소 매칭 좌표 없음: "${trimmedAddress}"`);
+        console.warn(
+          `[Sple Naver Geocoder] Geocoding response did not include coordinates. address="${trimmedAddress}"`,
+          response,
+        );
       }
       resolve(coordinates);
     });
