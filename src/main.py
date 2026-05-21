@@ -1,4 +1,4 @@
-﻿from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +11,7 @@ import json
 import re
 from pathlib import Path
 from typing import Optional
+import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text as sql_text
 from database import get_db, init_db, Place as DBPlace
@@ -177,6 +178,55 @@ def is_url_only_input(text: str) -> bool:
     return normalized.startswith(("http://", "https://")) and " " not in normalized
 
 
+async def geocode_address_via_naver_api(address: str) -> tuple[Optional[float], Optional[float]]:
+    """
+    네이버 Geocoding REST API를 서버 대 서버(Server-to-Server) 방식으로 직접 호출하여
+    주소(Address)의 위도(Latitude)와 경도(Longitude) 좌표(Coordinates)를 조회합니다.
+    """
+    client_id = os.getenv("NEXT_PUBLIC_NAVER_CLIENT_ID")
+    client_secret = os.getenv("NAVER_CLIENT_SECRET")
+    
+    if not client_id or not client_secret:
+        logger.warning(
+            "네이버 Client ID 또는 Client Secret 환경 변수(Environment Variable)가 설정되어 있지 않아 "
+            "백엔드 서버사이드 지오코딩 폴백 작동을 건너뜁니다."
+        )
+        return None, None
+        
+    url = "https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode"
+    headers = {
+        "X-NCP-APIGW-API-KEY-ID": client_id,
+        "X-NCP-APIGW-API-KEY": client_secret,
+        "Accept": "application/json"
+    }
+    params = {
+        "query": address
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as http_client:
+            response = await http_client.get(url, headers=headers, params=params)
+            if response.status_code == 200:
+                res_json = response.json()
+                addresses = res_json.get("addresses", [])
+                if addresses:
+                    addr_info = addresses[0]
+                    lat = float(addr_info["y"])
+                    lng = float(addr_info["x"])
+                    logger.info(f"서버사이드 지오코딩 성공: {address} -> 위도: {lat}, 경도: {lng}")
+                    return lat, lng
+                else:
+                    logger.warning(f"서버사이드 지오코딩 매칭 결과 없음: {address}")
+            else:
+                logger.error(
+                    f"네이버 지오코딩 API 호출 오류 (HTTP {response.status_code}): {response.text}"
+                )
+    except Exception as e:
+        logger.error(f"서버사이드 지오코딩 요청 예외 발생: {e}")
+        
+    return None, None
+
+
 async def verify_internal_api_key(x_sple_internal_key: Optional[str] = Header(default=None)):
     if BACKEND_API_KEY and x_sple_internal_key != BACKEND_API_KEY:
         raise HTTPException(status_code=401, detail={"code": "UNAUTHORIZED"})
@@ -221,6 +271,21 @@ async def create_place_api(
     db: AsyncSession = Depends(get_db),
     _: None = Depends(verify_internal_api_key),
 ):
+    lat = place.latitude
+    lng = place.longitude
+    status = place.geocoding_status
+
+    # 클라이언트가 좌표 변환에 실패했거나 좌표를 넘겨주지 않은 경우 서버사이드 지오코딩 폴백 작동
+    if (lat is None or lng is None or status == "failed") and place.address:
+        logger.info(f"클라이언트 좌표 누락 감지, 백엔드 지오코딩 폴백 작동: {place.address}")
+        server_lat, server_lng = await geocode_address_via_naver_api(place.address)
+        if server_lat is not None and server_lng is not None:
+            lat = server_lat
+            lng = server_lng
+            status = "resolved"
+        else:
+            status = "failed"
+
     db_place = DBPlace(
         user_id=place.user_id,
         name=place.name,
@@ -228,9 +293,9 @@ async def create_place_api(
         category=place.category,
         rating=place.rating,
         summary=place.summary,
-        latitude=place.latitude,
-        longitude=place.longitude,
-        geocoding_status=place.geocoding_status,
+        latitude=lat,
+        longitude=lng,
+        geocoding_status=status,
     )
     db.add(db_place)
     await db.commit()
@@ -271,18 +336,135 @@ async def update_place_api(
     if not db_place:
         raise HTTPException(status_code=404, detail={"code": "PLACE_NOT_FOUND"})
 
+    lat = place.latitude
+    lng = place.longitude
+    status = place.geocoding_status
+
+    # 주소가 존재하고 좌표 정보가 없는 경우 백엔드 지오코딩 폴백 작동
+    if (lat is None or lng is None or status == "failed") and place.address:
+        logger.info(f"클라이언트 좌표 누락 감지, 백엔드 지오코딩 폴백 작동 (수정 API): {place.address}")
+        server_lat, server_lng = await geocode_address_via_naver_api(place.address)
+        if server_lat is not None and server_lng is not None:
+            lat = server_lat
+            lng = server_lng
+            status = "resolved"
+        else:
+            status = "failed"
+
     db_place.name = place.name
     db_place.address = place.address
     db_place.category = place.category
     db_place.rating = place.rating
     db_place.summary = place.summary
-    db_place.latitude = place.latitude
-    db_place.longitude = place.longitude
-    db_place.geocoding_status = place.geocoding_status
+    db_place.latitude = lat
+    db_place.longitude = lng
+    db_place.geocoding_status = status
 
     await db.commit()
     await db.refresh(db_place)
     return JSONResponse(content={"status": "success", "data": serialize_place(db_place)})
+
+
+@app.delete("/api/places/{place_id}")
+async def delete_place_api(
+    place_id: int,
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(verify_internal_api_key),
+):
+    result = await db.execute(
+        select(DBPlace).where(
+            DBPlace.id == place_id,
+            DBPlace.user_id == user_id,
+        )
+    )
+    db_place = result.scalar_one_or_none()
+
+    if not db_place:
+        raise HTTPException(status_code=404, detail={"code": "PLACE_NOT_FOUND"})
+
+    await db.delete(db_place)
+    await db.commit()
+    return JSONResponse(content={"status": "success", "message": "장소가 성공적으로 삭제되었습니다."})
+
+
+@app.post("/api/places/recover-coordinates")
+async def recover_coordinates_api(
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(verify_internal_api_key),
+):
+    """
+    서버사이드(Server-Side)에 누락되거나 지오코딩 실패('failed') 상태인
+    과거 등록 맛집 데이터들의 위도/경도 좌표를 일괄적(Bulk)으로 복구하고 원격 DB에 저장합니다.
+    이 API는 내부 보안 키(x-sple-internal-key)에 의해 엄격히 보호됩니다.
+    """
+    logger.info("원격 데이터베이스 누락 좌표 일괄 복구 API 작동 시작")
+    
+    # 1. 위도/경도가 누락되었거나 지오코딩 실패('failed') 혹은 미처리('pending') 상태인 레코드들을 DB에서 조회
+    result = await db.execute(
+        select(DBPlace).where(
+            (DBPlace.latitude == None) | 
+            (DBPlace.longitude == None) | 
+            (DBPlace.geocoding_status == "failed") |
+            (DBPlace.geocoding_status == "pending")
+        )
+    )
+    target_places = result.scalars().all()
+    total_found = len(target_places)
+    
+    logger.info(f"좌표 누락 또는 실패 상태인 맛집 레코드 발견: {total_found}개")
+    
+    if total_found == 0:
+        return JSONResponse(content={
+            "status": "success",
+            "message": "복구 대상 맛집이 없습니다. 데이터베이스가 이미 완전히 최신 상태입니다.",
+            "data": {"processed": 0, "recovered": 0}
+        })
+        
+    recovered_count = 0
+    recovered_details = []
+    
+    # 2. 복구 대상 장소들을 하나씩 비동기로 지오코딩 변환
+    for place in target_places:
+        if not place.address:
+            logger.warning(f"장소 ID {place.id} ({place.name})의 주소(Address)가 비어 있어 지오코딩을 생략합니다.")
+            continue
+            
+        logger.info(f"장소 ID {place.id} ({place.name})의 주소({place.address}) 좌표 복구 시도 중...")
+        lat, lng = await geocode_address_via_naver_api(place.address)
+        
+        if lat is not None and lng is not None:
+            place.latitude = lat
+            place.longitude = lng
+            place.geocoding_status = "resolved"
+            recovered_count += 1
+            recovered_details.append({
+                "id": place.id,
+                "name": place.name,
+                "address": place.address,
+                "latitude": lat,
+                "longitude": lng
+            })
+            logger.info(f"장소 ID {place.id} 복구 성공: {lat}, {lng}")
+        else:
+            place.geocoding_status = "failed"
+            logger.warning(f"장소 ID {place.id} 복구 실패 (네이버 API 응답 없음 혹은 주소 오기재)")
+
+    # 3. 데이터베이스 트랜잭션 반영 및 커밋(Commit)
+    if recovered_count > 0:
+        await db.commit()
+        logger.info(f"총 {recovered_count}개의 맛집 좌표가 원격 DB에 성공적으로 저장되었습니다.")
+    
+    return JSONResponse(content={
+        "status": "success",
+        "message": f"복구 프로세스가 완료되었습니다. (검색: {total_found}개, 복구 성공: {recovered_count}개)",
+        "data": {
+            "total_found": total_found,
+            "recovered_count": recovered_count,
+            "details": recovered_details
+        }
+    })
+
 
 if __name__ == "__main__":
     import uvicorn

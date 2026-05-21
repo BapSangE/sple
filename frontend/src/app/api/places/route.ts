@@ -182,3 +182,48 @@ export async function PATCH(request: Request) {
     );
   }
 }
+
+export async function DELETE(request: Request) {
+  const session = await getServerSession(authOptions);
+  const userId = getSessionUserId(session?.user);
+
+  if (!userId) {
+    return NextResponse.json({ status: "error", code: "UNAUTHORIZED" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const placeId = searchParams.get("id");
+
+  if (!placeId) {
+    return NextResponse.json(
+      {
+        status: "error",
+        code: "INVALID_REQUEST",
+        message: "삭제할 장소 ID가 필요합니다.",
+      },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const response = await fetch(
+      backendUrl(`/api/places/${placeId}?user_id=${encodeURIComponent(userId)}`),
+      {
+        method: "DELETE",
+        headers: backendHeaders(),
+        cache: "no-store",
+      },
+    );
+
+    return forwardBackendJson(response, "장소 삭제 처리 중 백엔드 오류가 발생했습니다.");
+  } catch {
+    return NextResponse.json(
+      {
+        status: "error",
+        code: "BACKEND_UNREACHABLE",
+        message: "장소 삭제 서버에 연결하지 못했습니다.",
+      },
+      { status: 502 },
+    );
+  }
+}

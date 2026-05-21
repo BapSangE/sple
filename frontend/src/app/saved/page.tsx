@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, MapPin, X } from "lucide-react";
+import { Search, MapPin, X, Trash2 } from "lucide-react";
 import { apiUrl } from "@/lib/api";
 import { geocodeAddress, geocodingFieldsFromCoordinates } from "@/lib/naver-geocoding";
 
@@ -152,6 +152,32 @@ export default function SavedPage() {
     }
   };
 
+  const handleDeletePlace = async () => {
+    if (!selectedPlace) return;
+
+    const isConfirmed = window.confirm("정말 이 장소를 삭제하시겠습니까?");
+    if (!isConfirmed) return;
+
+    try {
+      const response = await fetch(apiUrl(`/api/places?id=${selectedPlace.id}`), {
+        method: "DELETE",
+      });
+
+      const data = await response.json();
+      if (!response.ok || data.status !== "success") {
+        throw new Error(data.message || "장소를 삭제하지 못했습니다.");
+      }
+
+      // 상태 동기화: 삭제된 장소 제외
+      setPlaces((currentPlaces) =>
+        currentPlaces.filter((place) => place.id !== selectedPlace.id),
+      );
+      closePlaceDetail();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "장소 삭제에 실패했습니다.");
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-background pt-[72px] pb-[80px] px-6">
       <div className="mt-6 mb-6">
@@ -257,9 +283,18 @@ export default function SavedPage() {
                     <MapPin size={14} /> {selectedPlace.address || "주소 정보 없음"}
                   </p>
                 </div>
-                <button onClick={closePlaceDetail} className="p-2 bg-gray-100 rounded-full">
-                  <X size={20} className="text-gray-500" />
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleDeletePlace}
+                    className="p-2 bg-red-50 text-red-500 hover:bg-red-100 rounded-full active:scale-95 transition-all"
+                    title="장소 삭제"
+                  >
+                    <Trash2 size={20} />
+                  </button>
+                  <button onClick={closePlaceDetail} className="p-2 bg-gray-100 rounded-full active:scale-95 transition-all">
+                    <X size={20} className="text-gray-500" />
+                  </button>
+                </div>
               </div>
 
               {selectedPlace.summary && (

@@ -116,16 +116,32 @@ export async function geocodeAddress(address: string) {
   if (!trimmedAddress || typeof window === "undefined") return null;
 
   const service = await waitForNaverGeocoder();
-  if (!service) return null;
+  if (!service) {
+    console.error(
+      "[Sple Naver Geocoder API] 네이버 지도 Geocoder 서비스를 불러오지 못했습니다.\n" +
+      "1. layout.tsx에 네이버 지도 스크립트 로드 시 '&submodules=geocoder' 옵션이 제대로 붙어 있는지 확인해 주세요.\n" +
+      "2. 환경 변수 NEXT_PUBLIC_NAVER_CLIENT_ID가 정확하게 정의되어 있는지 확인해 주세요.\n" +
+      "3. 네이버 클라우드 플랫폼(NCP) 콘솔에 현재 접속 중인 도메인(Web 서비스 URL)이 정확히 등록되어 있는지 확인해 주세요."
+    );
+    return null;
+  }
 
   return new Promise<PlaceCoordinates | null>((resolve) => {
     service.geocode({ address: trimmedAddress }, (status, response) => {
       if (status !== service.Status.OK) {
+        console.warn(
+          `[Sple Naver Geocoder API] 주소 지오코딩 실패 (주소: "${trimmedAddress}", 응답 상태: "${status}").\n` +
+          "네이버 클라우드 플랫폼 콘솔의 AI·NAVER API -> Application 설정에서 'Geocoding' 서비스 사용 권한이 활성화되어 있는지 확인해 주세요."
+        );
         resolve(null);
         return;
       }
 
-      resolve(parseNaverGeocodeCoordinates(response));
+      const coordinates = parseNaverGeocodeCoordinates(response);
+      if (!coordinates) {
+        console.warn(`[Sple Naver Geocoder API] 주소 매칭 좌표 없음: "${trimmedAddress}"`);
+      }
+      resolve(coordinates);
     });
   });
 }
