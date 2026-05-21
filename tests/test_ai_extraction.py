@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 import os
 import sys
 import pytest
@@ -6,13 +6,16 @@ import pytest
 # src 경로 추가
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from main import extract_place_info
+from main import extract_place_info, init_gemini_client
 from dotenv import load_dotenv
 
 @pytest.mark.asyncio
 async def test_extraction():
-    # .env 로드
+    # 환경 변수(Environment Variable) 로드
     load_dotenv()
+    
+    # 맛집 AI 정보 추출을 위한 클라이언트(Client) 사전 초기화 수행
+    init_gemini_client()
     
     # 사용자가 복사해 붙여넣은 맛집 텍스트
     sample_text = """

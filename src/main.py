@@ -275,8 +275,13 @@ async def create_place_api(
     lng = place.longitude
     status = place.geocoding_status
 
-    # 클라이언트가 좌표 변환에 실패했거나 좌표를 넘겨주지 않은 경우 서버사이드 지오코딩 폴백 작동
-    if (lat is None or lng is None or status == "failed") and place.address:
+    # 백엔드 지오코딩에 필요한 네이버 API 키 환경 변수(Environment Variable) 존재 여부 검사
+    client_id = os.getenv("NEXT_PUBLIC_NAVER_CLIENT_ID")
+    client_secret = os.getenv("NAVER_CLIENT_SECRET")
+    has_naver_keys = bool(client_id and client_secret)
+
+    # 클라이언트가 좌표 변환에 실패했거나 좌표를 넘겨주지 않은 경우이면서, 주소가 있고, 네이버 API 키가 설정되어 있는 경우에만 서버사이드 지오코딩 폴백 작동
+    if has_naver_keys and (lat is None or lng is None or status == "failed") and place.address:
         logger.info(f"클라이언트 좌표 누락 감지, 백엔드 지오코딩 폴백 작동: {place.address}")
         server_lat, server_lng = await geocode_address_via_naver_api(place.address)
         if server_lat is not None and server_lng is not None:
@@ -340,8 +345,13 @@ async def update_place_api(
     lng = place.longitude
     status = place.geocoding_status
 
-    # 주소가 존재하고 좌표 정보가 없는 경우 백엔드 지오코딩 폴백 작동
-    if (lat is None or lng is None or status == "failed") and place.address:
+    # 백엔드 지오코딩에 필요한 네이버 API 키 환경 변수(Environment Variable) 존재 여부 검사
+    client_id = os.getenv("NEXT_PUBLIC_NAVER_CLIENT_ID")
+    client_secret = os.getenv("NAVER_CLIENT_SECRET")
+    has_naver_keys = bool(client_id and client_secret)
+
+    # 주소가 존재하고 좌표 정보가 없는 경우이면서, 네이버 API 키가 설정되어 있는 경우에만 백엔드 지오코딩 폴백 작동
+    if has_naver_keys and (lat is None or lng is None or status == "failed") and place.address:
         logger.info(f"클라이언트 좌표 누락 감지, 백엔드 지오코딩 폴백 작동 (수정 API): {place.address}")
         server_lat, server_lng = await geocode_address_via_naver_api(place.address)
         if server_lat is not None and server_lng is not None:
