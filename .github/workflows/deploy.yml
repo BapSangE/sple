@@ -75,6 +75,10 @@ jobs:
             NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
             FRONTEND_URL=${{ secrets.FRONTEND_URL }}
             BACKEND_API_KEY=${{ secrets.BACKEND_API_KEY }}
+            NEXT_PUBLIC_NAVER_CLIENT_ID=${{ secrets.NEXT_PUBLIC_NAVER_CLIENT_ID }}
+            NAVER_CLIENT_SECRET=${{ secrets.NAVER_CLIENT_SECRET }}
+            NAVER_SEARCH_CLIENT_ID=${{ secrets.NAVER_SEARCH_CLIENT_ID }}
+            NAVER_SEARCH_CLIENT_SECRET=${{ secrets.NAVER_SEARCH_CLIENT_SECRET }}
 
       # 3. ECS 서비스 배포
       - name: Deploy to Amazon ECS

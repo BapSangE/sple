@@ -179,13 +179,13 @@ export default function SavedPage() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-background pt-[72px] pb-[80px] px-6">
-      <div className="mt-6 mb-6">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background px-6 pt-[72px] pb-[calc(96px+env(safe-area-inset-bottom))]">
+      <div className="mt-6 mb-6 shrink-0">
         <h1 className="text-2xl font-bold text-text-primary mb-2">저장된 장소</h1>
         <p className="text-sm text-text-secondary">당신만의 취향이 담긴 컬렉션</p>
       </div>
 
-      <div className="relative mb-6">
+      <div className="relative mb-6 shrink-0">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
         <input 
           type="text" 
@@ -196,7 +196,7 @@ export default function SavedPage() {
         />
       </div>
 
-      <div className="flex gap-2 overflow-x-auto hide-scrollbar mb-6">
+      <div className="mb-6 flex shrink-0 gap-2 overflow-x-auto hide-scrollbar">
         {CATEGORIES.map((cat) => (
           <button 
             key={cat} 
@@ -212,7 +212,7 @@ export default function SavedPage() {
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto hide-scrollbar flex flex-col gap-4 pb-6">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pb-32 hide-scrollbar [-webkit-overflow-scrolling:touch]">
         {status === "unauthenticated" ? (
            <div className="flex flex-col items-center justify-center py-10 text-gray-400 text-center">
              <span className="material-symbols-outlined text-4xl mb-2">lock</span>
@@ -272,7 +272,7 @@ export default function SavedPage() {
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl z-[70] px-6 pt-4 pb-12 shadow-2xl"
+              className="absolute bottom-0 left-0 right-0 z-[70] max-h-[calc(100%-88px)] overflow-y-auto overscroll-contain rounded-t-3xl bg-white px-6 pt-4 pb-[calc(112px+env(safe-area-inset-bottom))] shadow-2xl [-webkit-overflow-scrolling:touch]"
             >
               <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-6" />
 
