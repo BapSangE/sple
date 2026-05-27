@@ -114,3 +114,82 @@ async def test_places_api_requires_user_id_when_listing_places():
         response = await ac.get("/api/places")
 
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_places_enrich_api_stores_naver_metadata_for_owned_place(monkeypatch):
+    user_id = f"test-user-{uuid4()}"
+
+    class FakeMetadata:
+        title = "덮밥장사장 강남점"
+        url = "https://example.com/naver-place"
+        category = "음식점>일식"
+        description = "덮밥 전문점"
+        telephone = "02-0000-0000"
+        address = "서울 강남구"
+        road_address = "서울 강남구 테헤란로"
+        mapx = "3"
+        mapy = "4"
+        match_status = "matched"
+        enriched_at = None
+
+    def fake_search(name, address):
+        assert name == "덮밥장사장"
+        assert address == "서울 강남구"
+        return FakeMetadata()
+
+    monkeypatch.setattr("main.search_naver_local_place", fake_search)
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://test",
+    ) as ac:
+        create_response = await ac.post(
+            "/api/places",
+            json={
+                "user_id": user_id,
+                "name": "덮밥장사장",
+                "address": "서울 강남구",
+            },
+        )
+        place_id = create_response.json()["data"]["id"]
+
+        enrich_response = await ac.post(
+            f"/api/places/{place_id}/enrich",
+            json={"user_id": user_id},
+        )
+
+    assert enrich_response.status_code == 200
+    enriched = enrich_response.json()
+    assert enriched["status"] == "success"
+    assert enriched["data"]["naver_place_title"] == "덮밥장사장 강남점"
+    assert enriched["data"]["naver_place_url"] == "https://example.com/naver-place"
+    assert enriched["data"]["naver_category"] == "음식점>일식"
+    assert enriched["data"]["naver_match_status"] == "matched"
+
+
+@pytest.mark.asyncio
+async def test_places_enrich_api_rejects_other_users(monkeypatch):
+    owner_id = f"test-user-{uuid4()}"
+    other_user_id = f"test-user-{uuid4()}"
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://test",
+    ) as ac:
+        create_response = await ac.post(
+            "/api/places",
+            json={
+                "user_id": owner_id,
+                "name": "Sple Private Place",
+                "address": "서울",
+            },
+        )
+        place_id = create_response.json()["data"]["id"]
+
+        enrich_response = await ac.post(
+            f"/api/places/{place_id}/enrich",
+            json={"user_id": other_user_id},
+        )
+
+    assert enrich_response.status_code == 404

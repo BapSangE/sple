@@ -51,3 +51,77 @@ body {
 .material-symbols-outlined.fill {
   font-variation-settings: 'FILL' 1;
 }
+
+.sple-user-location-marker {
+  position: relative;
+  width: 28px;
+  height: 28px;
+}
+
+.sple-user-location-marker__pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.22);
+  animation: sple-location-pulse 1.8s ease-out infinite;
+}
+
+.sple-user-location-marker__dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border: 3px solid white;
+  border-radius: 999px;
+  background: #2563eb;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.24);
+  transform: translate(-50%, -50%);
+}
+
+.sple-place-marker {
+  position: relative;
+  width: 34px;
+  height: 42px;
+  transform: translateY(-8px);
+}
+
+.sple-place-marker__pin {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 28px;
+  height: 28px;
+  border: 3px solid white;
+  border-radius: 50% 50% 50% 0;
+  background: var(--color-primary);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.28);
+  transform: translateX(-50%) rotate(-45deg);
+}
+
+.sple-place-marker__center {
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: white;
+  transform: translateX(-50%);
+}
+
+.sple-place-marker--selected .sple-place-marker__pin {
+  background: var(--color-secondary);
+  box-shadow: 0 10px 24px rgba(255, 107, 27, 0.38);
+}
+
+@keyframes sple-location-pulse {
+  0% {
+    opacity: 0.7;
+    transform: scale(0.7);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}

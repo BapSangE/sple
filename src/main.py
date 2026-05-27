@@ -1,4 +1,6 @@
 from contextlib import asynccontextmanager
+import asyncio
+from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +17,7 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text as sql_text
 from database import get_db, init_db, Place as DBPlace
+from naver_place_search import search_naver_local_place
 
 # .env 파일 로드
 load_dotenv()
@@ -134,6 +137,18 @@ class PlaceItem(BaseModel):
         return value.strip()
 
 
+class PlaceEnrichRequest(BaseModel):
+    user_id: str
+    force: bool = False
+
+    @field_validator("user_id", mode="before")
+    @classmethod
+    def require_user_id(cls, value):
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("must be a non-empty string")
+        return value.strip()
+
+
 def serialize_place(place: DBPlace) -> dict:
     return {
         "id": place.id,
@@ -146,6 +161,21 @@ def serialize_place(place: DBPlace) -> dict:
         "latitude": place.latitude,
         "longitude": place.longitude,
         "geocoding_status": place.geocoding_status,
+        "naver_place_title": place.naver_place_title,
+        "naver_place_url": place.naver_place_url,
+        "naver_category": place.naver_category,
+        "naver_description": place.naver_description,
+        "naver_telephone": place.naver_telephone,
+        "naver_address": place.naver_address,
+        "naver_road_address": place.naver_road_address,
+        "naver_mapx": place.naver_mapx,
+        "naver_mapy": place.naver_mapy,
+        "naver_match_status": place.naver_match_status,
+        "naver_enriched_at": (
+            place.naver_enriched_at.isoformat()
+            if place.naver_enriched_at
+            else None
+        ),
     }
 
 
@@ -369,6 +399,50 @@ async def update_place_api(
     db_place.latitude = lat
     db_place.longitude = lng
     db_place.geocoding_status = status
+
+    await db.commit()
+    await db.refresh(db_place)
+    return JSONResponse(content={"status": "success", "data": serialize_place(db_place)})
+
+
+@app.post("/api/places/{place_id}/enrich")
+async def enrich_place_api(
+    place_id: int,
+    payload: PlaceEnrichRequest,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(verify_internal_api_key),
+):
+    result = await db.execute(
+        select(DBPlace).where(
+            DBPlace.id == place_id,
+            DBPlace.user_id == payload.user_id,
+        )
+    )
+    db_place = result.scalar_one_or_none()
+
+    if not db_place:
+        raise HTTPException(status_code=404, detail={"code": "PLACE_NOT_FOUND"})
+
+    if db_place.naver_enriched_at and not payload.force:
+        return JSONResponse(content={"status": "success", "data": serialize_place(db_place)})
+
+    metadata = await asyncio.to_thread(
+        search_naver_local_place,
+        db_place.name,
+        db_place.address,
+    )
+
+    db_place.naver_place_title = metadata.title
+    db_place.naver_place_url = metadata.url
+    db_place.naver_category = metadata.category
+    db_place.naver_description = metadata.description
+    db_place.naver_telephone = metadata.telephone
+    db_place.naver_address = metadata.address
+    db_place.naver_road_address = metadata.road_address
+    db_place.naver_mapx = metadata.mapx
+    db_place.naver_mapy = metadata.mapy
+    db_place.naver_match_status = metadata.match_status
+    db_place.naver_enriched_at = metadata.enriched_at or datetime.now(timezone.utc)
 
     await db.commit()
     await db.refresh(db_place)
