@@ -1,21 +1,32 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
+import PlaceDetailSheet, { type DetailPlace } from "@/components/PlaceDetailSheet";
 import { apiUrl } from "@/lib/api";
 import { geocodeAddress } from "@/lib/naver-geocoding";
+import {
+  createPlaceMarkerHtml,
+  createUserLocationMarkerHtml,
+} from "@/lib/map-marker-styles";
 
-interface MapPlace {
-  id: number;
-  name: string;
-  address?: string;
+interface MapPlace extends DetailPlace {
   latitude?: number | null;
   longitude?: number | null;
+  geocoding_status?: string | null;
 }
 
 interface PlacesResponse {
   status: string;
   data?: MapPlace[];
+  message?: string;
+}
+
+interface PlaceEnrichResponse {
+  status: string;
+  data?: MapPlace;
+  message?: string;
+  detail?: string | { message?: string };
 }
 
 interface UserLocation {
@@ -24,6 +35,7 @@ interface UserLocation {
 }
 
 type NaverLatLng = object;
+type NaverPoint = object;
 
 interface NaverMap {
   setCenter: (latLng: NaverLatLng) => void;
@@ -36,8 +48,22 @@ interface NaverMarker {
 
 interface NaverMapsApi {
   LatLng: new (lat: number, lng: number) => NaverLatLng;
+  Point: new (x: number, y: number) => NaverPoint;
   Map: new (element: HTMLElement, options: Record<string, unknown>) => NaverMap;
-  Marker: new (options: { position: NaverLatLng; map: NaverMap; title?: string }) => NaverMarker;
+  Marker: new (options: {
+    position: NaverLatLng;
+    map: NaverMap;
+    title?: string;
+    icon?: {
+      content: string;
+      anchor?: NaverPoint;
+    };
+    zIndex?: number;
+  }) => NaverMarker;
+  Event?: {
+    addListener: (target: unknown, eventName: string, listener: () => void) => unknown;
+    removeListener: (listener: unknown) => void;
+  };
 }
 
 type NaverWindow = Window & {
@@ -58,22 +84,68 @@ function getNaverMaps() {
 function hasCoordinates(place: MapPlace) {
   const lat = Number(place.latitude);
   const lng = Number(place.longitude);
-  return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+  return Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0;
+}
+
+function getErrorMessage(payload: PlaceEnrichResponse | null) {
+  if (!payload) return "네이버 장소 정보를 불러오지 못했습니다.";
+  if (typeof payload.detail === "string") return payload.detail;
+  if (payload.detail?.message) return payload.detail.message;
+  return payload.message || "네이버 장소 정보를 불러오지 못했습니다.";
 }
 
 export default function Map() {
   const { status } = useSession();
   const mapElement = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<NaverMap | null>(null);
+  const markersRef = useRef<NaverMarker[]>([]);
+  const markerListenersRef = useRef<unknown[]>([]);
+  const userMarkerRef = useRef<NaverMarker | null>(null);
+
   const [places, setPlaces] = useState<MapPlace[]>([]);
   const [resolvedPlaces, setResolvedPlaces] = useState<MapPlace[]>([]);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const [selectedPlace, setSelectedPlace] = useState<MapPlace | null>(null);
+  const [isLoadingNaver, setIsLoadingNaver] = useState(false);
+  const [naverError, setNaverError] = useState<string | null>(null);
 
-  // 네이버 지도(Naver Map) 객체 및 마커(Marker) 객체를 리액트 상태 변경과 무관하게 유지하기 위한 레퍼런스(useRef)
-  const mapInstanceRef = useRef<NaverMap | null>(null);
-  const markersRef = useRef<NaverMarker[]>([]);
-  const userMarkerRef = useRef<NaverMarker | null>(null);
+  const enrichPlace = useCallback(async (place: MapPlace) => {
+    if (place.naver_enriched_at || place.naver_match_status) return;
 
-  // 1. 현재 사용자 위치 획득 (최초 1회만 구동)
+    setIsLoadingNaver(true);
+    setNaverError(null);
+
+    try {
+      const response = await fetch(apiUrl("/api/places/enrich"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: place.id }),
+      });
+      const payload = (await response.json().catch(() => null)) as PlaceEnrichResponse | null;
+
+      if (!response.ok || payload?.status !== "success" || !payload.data) {
+        throw new Error(getErrorMessage(payload));
+      }
+
+      const enrichedPlace = payload.data;
+      setPlaces((current) =>
+        current.map((item) => (item.id === enrichedPlace.id ? { ...item, ...enrichedPlace } : item)),
+      );
+      setResolvedPlaces((current) =>
+        current.map((item) => (item.id === enrichedPlace.id ? { ...item, ...enrichedPlace } : item)),
+      );
+      setSelectedPlace((current) =>
+        current?.id === enrichedPlace.id ? { ...current, ...enrichedPlace } : current,
+      );
+    } catch (error) {
+      setNaverError(
+        error instanceof Error ? error.message : "네이버 장소 정보를 불러오지 못했습니다.",
+      );
+    } finally {
+      setIsLoadingNaver(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!navigator.geolocation) return;
 
@@ -95,9 +167,14 @@ export default function Map() {
     );
   }, []);
 
-  // 2. 회원 로그인 성공 시 백엔드 맛집 목록 API 호출
   useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status !== "authenticated") {
+      const timer = window.setTimeout(() => {
+        setPlaces([]);
+        setResolvedPlaces([]);
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
 
     fetch(apiUrl("/api/places"))
       .then((response) => response.json())
@@ -111,7 +188,6 @@ export default function Map() {
       });
   }, [status]);
 
-  // 3. 브라우저 실시간 지오코딩 폴백 및 좌표 복구 루틴
   useEffect(() => {
     let cancelled = false;
 
@@ -123,8 +199,7 @@ export default function Map() {
           const coordinates = await geocodeAddress(place.address);
           if (!coordinates) {
             console.warn(
-              `[Sple Map] "${place.name}" 장소의 좌표 복구 실패 (주소: ${place.address}). ` +
-              "위도/경도가 유효하지 않아 지도 마커 렌더링에서 제외됩니다."
+              `[Sple Map] "${place.name}" address could not be converted to coordinates.`,
             );
             return place;
           }
@@ -148,14 +223,11 @@ export default function Map() {
     };
   }, [places]);
 
-  // 4. 네이버 지도 객체 최초 1회 초기화 및 생성
   useEffect(() => {
     const maps = getNaverMaps();
     if (!mapElement.current || !maps || mapInstanceRef.current) return;
 
     const centerLocation = userLocation || SEOUL_CITY_HALL;
-
-    // 지도를 최초 1회만 안전하게 생성하여 mapInstanceRef에 보관
     mapInstanceRef.current = new maps.Map(mapElement.current, {
       center: new maps.LatLng(centerLocation.latitude, centerLocation.longitude),
       zoom: userLocation ? 14 : 15,
@@ -164,90 +236,112 @@ export default function Map() {
       mapDataControl: false,
       zoomControl: false,
     });
-  }, [userLocation]); // userLocation이 결정되거나 최초 로드 시 지도를 안전하게 한 번만 로드
+  }, [userLocation]);
 
-  // 네이버 지도 SDK 비동기 로딩 확인용 타이머 (Fallback)
   useEffect(() => {
     if (getNaverMaps()) return;
 
     const timer = window.setInterval(() => {
-      if (getNaverMaps() && mapElement.current && !mapInstanceRef.current) {
+      const maps = getNaverMaps();
+      if (maps && mapElement.current && !mapInstanceRef.current) {
         window.clearInterval(timer);
-        const maps = getNaverMaps();
-        if (maps) {
-          const centerLocation = userLocation || SEOUL_CITY_HALL;
-          mapInstanceRef.current = new maps.Map(mapElement.current!, {
-            center: new maps.LatLng(centerLocation.latitude, centerLocation.longitude),
-            zoom: userLocation ? 14 : 15,
-            minZoom: 10,
-            scaleControl: false,
-            mapDataControl: false,
-            zoomControl: false,
-          });
-        }
+        const centerLocation = userLocation || SEOUL_CITY_HALL;
+        mapInstanceRef.current = new maps.Map(mapElement.current, {
+          center: new maps.LatLng(centerLocation.latitude, centerLocation.longitude),
+          zoom: userLocation ? 14 : 15,
+          minZoom: 10,
+          scaleControl: false,
+          mapDataControl: false,
+          zoomControl: false,
+        });
       }
     }, 100);
 
     return () => window.clearInterval(timer);
   }, [userLocation]);
 
-  // 5. 실시간 사용자 위치(`userLocation`) 변경 시 사용자 핀 마커 및 중심좌표 동적 갱신
   useEffect(() => {
     const maps = getNaverMaps();
     const map = mapInstanceRef.current;
     if (!maps || !map || !userLocation) return;
 
-    // 기존 사용자 위치 마커가 존재한다면 제거
     if (userMarkerRef.current) {
       userMarkerRef.current.setMap(null);
       userMarkerRef.current = null;
     }
 
-    // 새로운 사용자 위치 마커 동적 생성
-    const userMarker = new maps.Marker({
+    userMarkerRef.current = new maps.Marker({
       position: new maps.LatLng(userLocation.latitude, userLocation.longitude),
       map,
       title: "현재 위치",
+      icon: {
+        content: createUserLocationMarkerHtml(),
+        anchor: new maps.Point(14, 14),
+      },
+      zIndex: 100,
     });
-    userMarkerRef.current = userMarker;
 
-    // 지도의 줌레벨 및 중심좌표를 부드럽게 세팅
     map.setCenter(new maps.LatLng(userLocation.latitude, userLocation.longitude));
     map.setZoom(14);
   }, [userLocation]);
 
-  // 6. 맛집 목록(`resolvedPlaces`) 데이터 및 로그인 상태가 감지되면 마커들을 동적으로 지도에 렌더링
   useEffect(() => {
     const maps = getNaverMaps();
     const map = mapInstanceRef.current;
     if (!maps || !map) return;
 
-    // 기존에 그려져 있던 맛집 마커들을 전부 지도에서 제거하여 리소스를 클리어 (메모리 관리 최적화)
+    markerListenersRef.current.forEach((listener) => {
+      maps.Event?.removeListener(listener);
+    });
+    markerListenersRef.current = [];
+
     markersRef.current.forEach((marker) => marker.setMap(null));
     markersRef.current = [];
 
-    // 로그인된 유저의 최종 복구 맛집 리스트 필터링
     const visiblePlaces = status === "authenticated" ? resolvedPlaces : [];
     const markerPlaces = visiblePlaces.filter(hasCoordinates);
 
-    // 새로운 맛집 마커 객체들을 지도를 파괴하지 않고 지도 객체 위에 실시간 렌더링
-    const newMarkers = markerPlaces.map((place) => {
+    markersRef.current = markerPlaces.map((place) => {
       const markerPosition = new maps.LatLng(Number(place.latitude), Number(place.longitude));
-      return new maps.Marker({
+      const marker = new maps.Marker({
         position: markerPosition,
         map,
         title: place.name,
+        icon: {
+          content: createPlaceMarkerHtml({ selected: selectedPlace?.id === place.id }),
+          anchor: new maps.Point(17, 42),
+        },
+        zIndex: selectedPlace?.id === place.id ? 120 : 80,
       });
-    });
-    markersRef.current = newMarkers;
 
-    // 만약 현재 사용자 GPS 수집에 실패했으나 등록된 맛집이 있으면, 시점을 첫 번째 맛집 중심으로 자동 셋팅
+      const listener = maps.Event?.addListener(marker, "click", () => {
+        setSelectedPlace(place);
+        void enrichPlace(place);
+      });
+      if (listener) markerListenersRef.current.push(listener);
+
+      return marker;
+    });
+
     if (!userLocation && markerPlaces.length > 0) {
       const firstPlace = markerPlaces[0];
       map.setCenter(new maps.LatLng(Number(firstPlace.latitude), Number(firstPlace.longitude)));
       map.setZoom(13);
     }
-  }, [resolvedPlaces, status, userLocation]);
+  }, [enrichPlace, resolvedPlaces, selectedPlace?.id, status, userLocation]);
 
-  return <div ref={mapElement} className="h-full w-full bg-[#E5E2E1]" />;
+  return (
+    <>
+      <div ref={mapElement} className="h-full w-full bg-[#E5E2E1]" />
+      <PlaceDetailSheet
+        place={selectedPlace}
+        isLoadingNaver={isLoadingNaver}
+        naverError={naverError}
+        onClose={() => {
+          setSelectedPlace(null);
+          setNaverError(null);
+        }}
+      />
+    </>
+  );
 }
