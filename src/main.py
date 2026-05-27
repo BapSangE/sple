@@ -190,6 +190,18 @@ async def extract_place_info(text: str):
         '형식: [{"name":"상호명","address":"주소 또는 빈 문자열"}]. '
         f"텍스트: {text}"
     )
+    prompt = (
+        "You extract Korean place/restaurant information from pasted social text. "
+        "Return only a valid JSON array with no markdown or explanation. "
+        "Each item must use this schema: "
+        '{"name":"store or place name","address":"address or empty string",'
+        '"category":"Dining|Cafe|Bar|Place","summary":"short Korean feature summary"}. '
+        "Rules: name is required; address can be empty if missing; "
+        "category should be the closest one of Dining, Cafe, Bar, Place; "
+        "summary must be Korean and explain the key features from the text in 80 characters or less "
+        "(menu, mood, price/event, recommendation reason). "
+        f"Text: {text}"
+    )
     try:
         response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
         match = re.search(r'\[.*\]', response.text, re.DOTALL)
@@ -423,7 +435,12 @@ async def enrich_place_api(
     if not db_place:
         raise HTTPException(status_code=404, detail={"code": "PLACE_NOT_FOUND"})
 
-    if db_place.naver_enriched_at and not payload.force:
+    cacheable_naver_statuses = {"matched", "low_confidence", "not_found"}
+    if (
+        db_place.naver_enriched_at
+        and db_place.naver_match_status in cacheable_naver_statuses
+        and not payload.force
+    ):
         return JSONResponse(content={"status": "success", "data": serialize_place(db_place)})
 
     metadata = await asyncio.to_thread(

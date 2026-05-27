@@ -94,6 +94,13 @@ function getErrorMessage(payload: PlaceEnrichResponse | null) {
   return payload.message || "네이버 장소 정보를 불러오지 못했습니다.";
 }
 
+function hasCacheableNaverStatus(place: MapPlace) {
+  return (
+    Boolean(place.naver_enriched_at) &&
+    ["matched", "low_confidence", "not_found"].includes(place.naver_match_status || "")
+  );
+}
+
 export default function Map() {
   const { status } = useSession();
   const mapElement = useRef<HTMLDivElement>(null);
@@ -110,7 +117,7 @@ export default function Map() {
   const [naverError, setNaverError] = useState<string | null>(null);
 
   const enrichPlace = useCallback(async (place: MapPlace) => {
-    if (place.naver_enriched_at || place.naver_match_status) return;
+    if (hasCacheableNaverStatus(place)) return;
 
     setIsLoadingNaver(true);
     setNaverError(null);

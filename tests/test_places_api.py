@@ -193,3 +193,70 @@ async def test_places_enrich_api_rejects_other_users(monkeypatch):
         )
 
     assert enrich_response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_places_enrich_api_retries_transient_missing_credentials_status(monkeypatch):
+    user_id = f"test-user-{uuid4()}"
+
+    class MissingCredentialsMetadata:
+        title = None
+        url = None
+        category = None
+        description = None
+        telephone = None
+        address = None
+        road_address = None
+        mapx = None
+        mapy = None
+        match_status = "missing_credentials"
+        enriched_at = None
+
+    class MatchedMetadata:
+        title = "Retry Success Place"
+        url = "https://example.com/retry"
+        category = "음식점"
+        description = None
+        telephone = None
+        address = "서울"
+        road_address = "서울 중구"
+        mapx = None
+        mapy = None
+        match_status = "matched"
+        enriched_at = None
+
+    metadata_sequence = [MissingCredentialsMetadata(), MatchedMetadata()]
+
+    def fake_search(name, address):
+        return metadata_sequence.pop(0)
+
+    monkeypatch.setattr("main.search_naver_local_place", fake_search)
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://test",
+    ) as ac:
+        create_response = await ac.post(
+            "/api/places",
+            json={
+                "user_id": user_id,
+                "name": "Retry Place",
+                "address": "서울",
+            },
+        )
+        place_id = create_response.json()["data"]["id"]
+
+        first_response = await ac.post(
+            f"/api/places/{place_id}/enrich",
+            json={"user_id": user_id},
+        )
+        second_response = await ac.post(
+            f"/api/places/{place_id}/enrich",
+            json={"user_id": user_id},
+        )
+
+    assert first_response.status_code == 200
+    assert first_response.json()["data"]["naver_match_status"] == "missing_credentials"
+    assert second_response.status_code == 200
+    assert second_response.json()["data"]["naver_match_status"] == "matched"
+    assert second_response.json()["data"]["naver_place_title"] == "Retry Success Place"

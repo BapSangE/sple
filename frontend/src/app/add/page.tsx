@@ -7,21 +7,18 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import AdBanner from "@/components/AdBanner";
 import { apiUrl } from "@/lib/api";
+import { normalizeAnalyzedPlace, type NormalizedAnalyzedPlace } from "@/lib/analyzed-place";
 import {
   geocodeAddress,
   geocodingFieldsFromCoordinates,
   pendingGeocodingFields,
 } from "@/lib/naver-geocoding";
 
-interface Place {
-  name: string;
-  address?: string;
-  selected?: boolean;
-}
+type Place = NormalizedAnalyzedPlace;
 
 interface AnalyzeResponse {
   status: string;
-  data?: Array<Partial<Pick<Place, "name" | "address">>> | null;
+  data?: Array<Partial<Pick<Place, "name" | "address" | "category" | "summary">>> | null;
   message?: string;
 }
 
@@ -41,15 +38,6 @@ async function readErrorMessage(response: Response) {
   } catch {
     return "장소 저장에 실패했습니다.";
   }
-}
-
-function normalizePlace(place: Partial<Pick<Place, "name" | "address">>): Place | null {
-  const name = place.name?.trim();
-  const address = place.address?.trim();
-
-  if (!name) return null;
-
-  return { name, address, selected: true };
 }
 
 export default function AddPage() {
@@ -84,7 +72,7 @@ export default function AddPage() {
 
       if (data.status === "success" && data.data && data.data.length > 0) {
         const extractedPlaces = data.data
-          .map(normalizePlace)
+          .map(normalizeAnalyzedPlace)
           .filter((place): place is Place => place !== null);
 
         if (extractedPlaces.length > 0) {
@@ -127,7 +115,7 @@ export default function AddPage() {
 
     const selectedPlaces = places
       .filter((place) => place.selected)
-      .map(normalizePlace)
+      .map(normalizeAnalyzedPlace)
       .filter((place): place is Place => place !== null);
 
     if (selectedPlaces.length === 0) {
@@ -171,6 +159,8 @@ export default function AddPage() {
             body: JSON.stringify({
               name: place.name,
               address: place.address || "",
+              category: place.category,
+              summary: place.summary,
               latitude: place.latitude,
               longitude: place.longitude,
               geocoding_status: place.geocoding_status,
@@ -315,6 +305,20 @@ export default function AddPage() {
                     <p className="text-xs text-text-secondary truncate mt-1">
                       {place.address || "주소 정보 없음"}
                     </p>
+                    {(place.category || place.summary) && (
+                      <div className="mt-2 flex flex-col gap-1">
+                        {place.category && (
+                          <span className="w-fit rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
+                            {place.category}
+                          </span>
+                        )}
+                        {place.summary && (
+                          <p className="line-clamp-2 text-xs leading-relaxed text-text-primary/75">
+                            {place.summary}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <button
