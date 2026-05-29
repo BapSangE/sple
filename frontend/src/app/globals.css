@@ -24,6 +24,16 @@
   --spacing-safe-margin: 24px;
 }
 
+:root {
+  --app-top-bar-height: 72px;
+  --app-bottom-nav-height: 62px;
+  --app-bottom-nav-gap: 24px;
+  --app-bottom-nav-offset: calc(var(--app-bottom-nav-gap) + env(safe-area-inset-bottom));
+  --app-content-bottom-padding: calc(
+    var(--app-bottom-nav-height) + var(--app-bottom-nav-offset) + 18px
+  );
+}
+
 body {
   background-color: var(--color-background);
   color: var(--color-text-primary);

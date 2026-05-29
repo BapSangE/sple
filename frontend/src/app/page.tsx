@@ -10,7 +10,7 @@ export default function Home() {
       <Map />
 
       {/* 우측 하단 맵 컨트롤 버튼들 */}
-      <div className="absolute right-4 bottom-[100px] flex flex-col gap-3 z-10">
+      <div className="absolute right-4 bottom-[calc(var(--app-content-bottom-padding)+16px)] flex flex-col gap-3 z-10">
         <button className="bg-white/90 backdrop-blur-md p-3 rounded-full shadow-[0px_4px_12px_rgba(0,0,0,0.1)] active:scale-95 transition-transform">
           <Layers size={22} className="text-gray-700" />
         </button>

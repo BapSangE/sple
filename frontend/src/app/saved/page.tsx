@@ -179,7 +179,7 @@ export default function SavedPage() {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background px-6 pt-[72px] pb-[calc(96px+env(safe-area-inset-bottom))]">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background px-6 pt-[72px] pb-[var(--app-content-bottom-padding)]">
       <div className="mt-6 mb-6 shrink-0">
         <h1 className="text-2xl font-bold text-text-primary mb-2">저장된 장소</h1>
         <p className="text-sm text-text-secondary">당신만의 취향이 담긴 컬렉션</p>
@@ -212,7 +212,7 @@ export default function SavedPage() {
         ))}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pb-32 hide-scrollbar [-webkit-overflow-scrolling:touch]">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pb-[calc(var(--app-content-bottom-padding)+24px)] hide-scrollbar [-webkit-overflow-scrolling:touch]">
         {status === "unauthenticated" ? (
            <div className="flex flex-col items-center justify-center py-10 text-gray-400 text-center">
              <span className="material-symbols-outlined text-4xl mb-2">lock</span>
@@ -265,14 +265,14 @@ export default function SavedPage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={closePlaceDetail}
-              className="absolute inset-0 bg-black/40 backdrop-blur-sm z-[60]"
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60]"
             />
             <motion.div
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="absolute bottom-0 left-0 right-0 z-[70] max-h-[calc(100%-88px)] overflow-y-auto overscroll-contain rounded-t-3xl bg-white px-6 pt-4 pb-[calc(112px+env(safe-area-inset-bottom))] shadow-2xl [-webkit-overflow-scrolling:touch]"
+              className="fixed left-0 right-0 bottom-[var(--app-content-bottom-padding)] z-[70] max-h-[calc(100dvh-var(--app-top-bar-height)-var(--app-content-bottom-padding)-16px)] overflow-y-auto overscroll-contain rounded-t-3xl bg-white px-6 pt-4 pb-6 shadow-2xl [-webkit-overflow-scrolling:touch]"
             >
               <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-6" />
 

@@ -47,7 +47,7 @@ export default function PlaceDetailSheet({
   const hasNaverData = Boolean(place.naver_place_title || place.naver_category || place.naver_road_address);
 
   return (
-    <section className="absolute left-4 right-4 bottom-[104px] z-40 max-h-[52vh] overflow-y-auto rounded-[24px] border border-black/5 bg-white px-5 py-4 shadow-[0_18px_48px_rgba(15,23,42,0.22)]">
+    <section className="fixed left-4 right-4 bottom-[var(--app-content-bottom-padding)] z-40 max-h-[calc(100dvh-var(--app-top-bar-height)-var(--app-content-bottom-padding)-16px)] overflow-y-auto overscroll-contain rounded-[24px] border border-black/5 bg-white px-5 py-4 shadow-[0_18px_48px_rgba(15,23,42,0.22)] [-webkit-overflow-scrolling:touch]">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="mb-2 flex items-center gap-2">
