@@ -69,7 +69,7 @@ jobs:
           image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
           environment-variables: |
             DATABASE_URL=${{ secrets.DATABASE_URL }}
-            GCP_SA_KEY_JSON=${{ secrets.GCP_SA_KEY_JSON }}
+            GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
             GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
             GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
             NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
