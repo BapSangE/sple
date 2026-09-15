@@ -98,3 +98,21 @@ def test_search_naver_local_place_returns_not_found(monkeypatch):
 
     assert result.match_status == "not_found"
     assert result.title is None
+
+
+@pytest.mark.parametrize("address, expected, status", [
+    ("서울특별시 성동구", "서울 성동구", "matched"),
+    ("부산 해운대구", "서울 강남구", "low_confidence"),
+    ("", "서울 강남구", "low_confidence"),
+])
+def test_same_brand_requires_matching_region(monkeypatch, address, expected, status):
+    monkeypatch.setenv("NAVER_SEARCH_CLIENT_ID", "client")
+    monkeypatch.setenv("NAVER_SEARCH_CLIENT_SECRET", "secret")
+    class Response:
+        def raise_for_status(self): pass
+        def json(self):
+            return {"items": [{"title": "테스트카페", "address": addr} for addr in ("서울 강남구", "서울 성동구")]}
+    monkeypatch.setattr("naver_place_search.httpx.get", lambda *args, **kwargs: Response())
+    result = search_naver_local_place("테스트카페", address)
+    assert result.address == expected
+    assert result.match_status == status

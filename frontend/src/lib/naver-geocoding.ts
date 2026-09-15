@@ -160,23 +160,32 @@ export async function geocodeAddress(address: string) {
   }
 
   return new Promise<PlaceCoordinates | null>((resolve) => {
-    service.geocode(createNaverGeocodeOptions(trimmedAddress), (status, response) => {
-      if (status !== service.Status.OK) {
-        console.warn(
-          `[Sple Naver Geocoder] Geocoding failed. address="${trimmedAddress}", status="${status}"`,
-        );
-        resolve(null);
-        return;
-      }
-
-      const coordinates = parseNaverGeocodeCoordinates(response);
-      if (!coordinates) {
-        console.warn(
-          `[Sple Naver Geocoder] Geocoding response did not include coordinates. address="${trimmedAddress}"`,
-          response,
-        );
-      }
+    const timer = setTimeout(() => resolve(null), 5_000);
+    const finish = (coordinates: PlaceCoordinates | null) => {
+      clearTimeout(timer);
       resolve(coordinates);
-    });
+    };
+    try {
+      service.geocode(createNaverGeocodeOptions(trimmedAddress), (status, response) => {
+        if (status !== service.Status.OK) {
+          console.warn(
+            `[Sple Naver Geocoder] Geocoding failed. address="${trimmedAddress}", status="${status}"`,
+          );
+          finish(null);
+          return;
+        }
+
+        const coordinates = parseNaverGeocodeCoordinates(response);
+        if (!coordinates) {
+          console.warn(
+            `[Sple Naver Geocoder] Geocoding response did not include coordinates. address="${trimmedAddress}"`,
+            response,
+          );
+        }
+        finish(coordinates);
+      });
+    } catch {
+      finish(null);
+    }
   });
 }

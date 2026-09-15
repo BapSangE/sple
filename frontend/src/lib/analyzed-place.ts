@@ -14,13 +14,14 @@ export interface NormalizedAnalyzedPlace {
 }
 
 function normalizeOptionalText(value?: string | null) {
-  const trimmed = value?.trim();
+  const trimmed = typeof value === "string" ? value.trim() : "";
   return trimmed || undefined;
 }
 
 export function normalizeAnalyzedPlace(
   place: AnalyzedPlaceInput,
 ): NormalizedAnalyzedPlace | null {
+  if (!place || typeof place !== "object") return null;
   const name = normalizeOptionalText(place.name);
   if (!name) return null;
 

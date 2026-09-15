@@ -2,10 +2,28 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  geocodeAddress,
   createNaverGeocodeOptions,
   geocodingFieldsFromCoordinates,
   parseNaverGeocodeCoordinates,
-} from "../src/lib/naver-geocoding.js";
+} from "../src/lib/naver-geocoding.ts";
+
+test("geocoding with no callback times out so saving can continue", async (context) => {
+  context.mock.timers.enable({ apis: ["setTimeout"] });
+  const previous = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Object.defineProperty(globalThis, "window", { configurable: true, value: {
+    naver: { maps: { Service: { Status: { OK: "OK" }, geocode() {} } } },
+  } });
+  try {
+    const pending = geocodeAddress("서울");
+    await new Promise(resolve => setImmediate(resolve));
+    context.mock.timers.tick(5_000);
+    assert.equal(await pending, null);
+  } finally {
+    if (previous) Object.defineProperty(globalThis, "window", previous);
+    else Reflect.deleteProperty(globalThis, "window");
+  }
+});
 
 test("createNaverGeocodeOptions uses NCP geocoder query parameter", () => {
   assert.deepEqual(createNaverGeocodeOptions("  서울 성동구 아차산로9길 8  "), {

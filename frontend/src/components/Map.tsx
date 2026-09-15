@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import PlaceDetailSheet, { type DetailPlace } from "@/components/PlaceDetailSheet";
 import { apiUrl } from "@/lib/api";
 import { geocodeAddress } from "@/lib/naver-geocoding";
+import { hasFreshNaverMetadata } from "@/lib/naver-cache";
 import {
   createPlaceMarkerHtml,
   createUserLocationMarkerHtml,
@@ -95,10 +96,7 @@ function getErrorMessage(payload: PlaceEnrichResponse | null) {
 }
 
 function hasCacheableNaverStatus(place: MapPlace) {
-  return (
-    Boolean(place.naver_enriched_at) &&
-    ["matched", "low_confidence", "not_found"].includes(place.naver_match_status || "")
-  );
+  return hasFreshNaverMetadata(place);
 }
 
 export default function Map() {

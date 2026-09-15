@@ -185,6 +185,8 @@ NAVER_SEARCH_CLIENT_SECRET=...
 
 ## 데이터베이스 마이그레이션
 
+사용자 격리·AI 오류 처리·저장 재시도 변경과 배포 순서는 [안정화 안내](docs/2026-09-15_RELIABILITY.md)를 참고하세요.
+
 Supabase SQL Editor에서 아래 migration을 순서대로 적용합니다.
 
 ```text
@@ -193,6 +195,7 @@ migrations/2026-05-15_places_user_id_text.sql
 migrations/2026-05-19_places_address_optional.sql
 migrations/2026-05-19_places_geocoding_fields.sql
 migrations/2026-05-27_places_naver_metadata.sql
+migrations/20260915052753_places_save_request.sql
 ```
 
 `2026-05-27_places_naver_metadata.sql`는 네이버 장소 데이터 보강을 위해 아래 nullable 컬럼을 추가합니다.
@@ -213,9 +216,11 @@ migrations/2026-05-27_places_naver_metadata.sql
 
 ### Backend
 
+로컬에서도 백엔드와 프론트엔드에 같은 `BACKEND_API_KEY`를 설정합니다. 키 없이 실행하는 개발 전용 예외는 `APP_ENV=development`, `ALLOW_INSECURE_LOCAL_AUTH=true`를 모두 명시해야 하며 운영에서는 사용하지 않습니다.
+
 ```bash
 uv sync
-uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn main:app --app-dir src --reload --host 0.0.0.0 --port 8000
 ```
 
 Health check:
@@ -252,13 +257,13 @@ npm run build
 프론트엔드 유틸 테스트:
 
 ```bash
-node --test frontend/tests/analyzed-place.test.mts frontend/tests/map-marker-styles.test.mts
+node --test frontend/tests/*.test.mts
 ```
 
 ### Backend
 
 ```bash
-uv run pytest tests/test_e2e_api.py tests/test_places_api.py tests/test_naver_place_search.py tests/test_deploy_workflow.py -q
+uv run pytest -q
 ```
 
 ## 배포

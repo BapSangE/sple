@@ -24,6 +24,8 @@ export async function POST() {
     const response = await fetch(backendUrl("/api/places/recover-coordinates"), {
       method: "POST",
       headers: backendHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ user_id: userId }),
+      signal: AbortSignal.timeout(60_000),
       cache: "no-store",
     });
 

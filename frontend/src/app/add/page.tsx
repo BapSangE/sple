@@ -1,20 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ExternalLink, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import AdBanner from "@/components/AdBanner";
 import { apiUrl } from "@/lib/api";
-import { normalizeAnalyzedPlace, type NormalizedAnalyzedPlace } from "@/lib/analyzed-place";
+import { normalizeAnalyzedPlace } from "@/lib/analyzed-place";
 import {
   geocodeAddress,
   geocodingFieldsFromCoordinates,
   pendingGeocodingFields,
 } from "@/lib/naver-geocoding";
 
-type Place = NormalizedAnalyzedPlace;
+import { applySaveResults, DRAFT_KEY, readDraft, type SaveCandidate } from "@/lib/place-draft";
+
+type Place = SaveCandidate;
 
 interface AnalyzeResponse {
   status: string;
@@ -41,7 +43,8 @@ async function readErrorMessage(response: Response) {
 }
 
 export default function AddPage() {
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
+  const userId = (session?.user as { id?: string } | undefined)?.id || null;
   const router = useRouter();
   const [url, setUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -50,8 +53,50 @@ export default function AddPage() {
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<"input" | "loading" | "result">("input");
 
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftOwner, setDraftOwner] = useState<string | null | undefined>(undefined);
+  const saveInFlight = useRef(false);
+  const discardDraft = useRef(false);
+
+  useEffect(() => {
+    if (sessionStatus === "loading") return;
+    try {
+      const draft = readDraft(sessionStorage.getItem(DRAFT_KEY));
+      if (draft && (!draft.userId || draft.userId === userId)) {
+        // Restore browser-only state after hydration and session resolution.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setUrl(draft.text);
+        setPlaces(draft.places);
+        setStep(draft.places.length ? "result" : "input");
+      } else {
+        sessionStorage.removeItem(DRAFT_KEY);
+        setUrl("");
+        setPlaces([]);
+        setStep("input");
+      }
+    } catch {
+      // Never retain another account's draft when storage is unavailable.
+      setUrl("");
+      setPlaces([]);
+      setStep("input");
+    }
+    setDraftOwner(userId);
+    setDraftReady(true);
+  }, [sessionStatus, userId]);
+
+  useEffect(() => {
+    if (!draftReady || sessionStatus === "loading" || discardDraft.current || draftOwner !== userId) return;
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+        text: url, places, userId, updatedAt: Date.now(),
+      }));
+    } catch {
+      // A login attempt explicitly checks persistence before navigating.
+    }
+  }, [draftReady, draftOwner, sessionStatus, url, places, userId]);
+
   const handleExtract = async () => {
-    if (!url.trim()) return;
+    if (!url.trim() || isLoading) return;
     setIsLoading(true);
     setStep("loading");
     setError(null);
@@ -61,11 +106,12 @@ export default function AddPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: url.trim() }),
+        signal: AbortSignal.timeout(35_000),
       });
       const data = (await res.json()) as AnalyzeResponse;
 
       if (!res.ok) {
-        setError(data.message || "장소가 언급된 텍스트를 복사해 붙여넣어 주세요.");
+        setError(data.message || (data as ApiErrorResponse).detail?.message || "장소 분석에 실패했습니다. 잠시 후 다시 시도해 주세요.");
         setStep("input");
         return;
       }
@@ -73,7 +119,8 @@ export default function AddPage() {
       if (data.status === "success" && data.data && data.data.length > 0) {
         const extractedPlaces = data.data
           .map(normalizeAnalyzedPlace)
-          .filter((place): place is Place => place !== null);
+          .filter((place) => place !== null)
+          .map((place) => ({ ...place, request_id: crypto.randomUUID(), saved: false }));
 
         if (extractedPlaces.length > 0) {
           setPlaces(extractedPlaces);
@@ -95,9 +142,10 @@ export default function AddPage() {
   };
 
   const togglePlace = (index: number) => {
+    if (saveInFlight.current) return;
     setPlaces((currentPlaces) =>
       currentPlaces.map((place, placeIndex) =>
-        placeIndex === index ? { ...place, selected: !place.selected } : place,
+        placeIndex === index && !place.saved ? { ...place, selected: !place.selected } : place,
       ),
     );
   };
@@ -111,76 +159,59 @@ export default function AddPage() {
   };
 
   const handleSave = async () => {
-    if (isSaving) return;
-
-    const selectedPlaces = places
-      .filter((place) => place.selected)
-      .map(normalizeAnalyzedPlace)
-      .filter((place): place is Place => place !== null);
-
-    if (selectedPlaces.length === 0) {
-      alert("저장할 수 있는 장소가 없습니다. 장소명이 있는 결과를 선택해 주세요.");
-      return;
-    }
-
-    const userId = session?.user
-      ? (session.user as typeof session.user & { id?: string }).id
-      : undefined;
+    if (saveInFlight.current || !draftReady || draftOwner !== userId || sessionStatus === "loading") return;
+    const selectedPlaces = places.filter(place => place.selected && !place.saved);
+    if (!selectedPlaces.length) return;
 
     if (!userId) {
-      alert("로그인이 필요합니다. 프로필에서 로그인해 주세요.");
+      try {
+        sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+          text: url, places, userId: null, updatedAt: Date.now(),
+        }));
+      } catch {
+        alert("분석 결과를 보관하지 못했습니다. 브라우저 저장소를 허용한 뒤 로그인해 주세요.");
+        return;
+      }
+      await signIn("google", { callbackUrl: "/add" });
       return;
     }
 
+    saveInFlight.current = true;
     setIsSaving(true);
     try {
-      const placesWithCoordinates = await Promise.all(
-        selectedPlaces.map(async (place) => {
-          if (!place.address) {
-            return {
-              ...place,
-              ...pendingGeocodingFields(),
-            };
-          }
-
-          const coordinates = await geocodeAddress(place.address);
-          return {
-            ...place,
-            ...geocodingFieldsFromCoordinates(coordinates),
-          };
-        }),
-      );
-
-      const responses = await Promise.all(
-        placesWithCoordinates.map((place) =>
-          fetch(apiUrl("/api/places"), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              name: place.name,
-              address: place.address || "",
-              category: place.category,
-              summary: place.summary,
-              latitude: place.latitude,
-              longitude: place.longitude,
-              geocoding_status: place.geocoding_status,
-            }),
+      const results = await Promise.allSettled(selectedPlaces.map(async place => {
+        const coordinates = place.address ? await geocodeAddress(place.address) : null;
+        const response = await fetch(apiUrl("/api/places"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            request_id: place.request_id,
+            name: place.name, address: place.address || "",
+            category: place.category, summary: place.summary,
+            ...(place.address ? geocodingFieldsFromCoordinates(coordinates) : pendingGeocodingFields()),
           }),
-        ),
-      );
-
-      const failedResponse = responses.find((response) => !response.ok);
-      if (failedResponse) {
-        const message = await readErrorMessage(failedResponse);
-        throw new Error(message);
+          signal: AbortSignal.timeout(20_000),
+        });
+        if (!response.ok) throw new Error(await readErrorMessage(response));
+        const result = await response.json();
+        if (result.status !== "success" || !result.data?.id) throw new Error("저장 결과를 확인하지 못했습니다. 다시 시도해 주세요.");
+        return place.request_id;
+      }));
+      const successfulIds = new Set(results.flatMap(result => result.status === "fulfilled" ? [result.value] : []));
+      const nextPlaces = applySaveResults(places, successfulIds);
+      setPlaces(nextPlaces);
+      const failed = results.filter(result => result.status === "rejected");
+      if (failed.length) {
+        const reason = failed[0].reason;
+        alert(`${successfulIds.size}개 저장 완료, ${failed.length}개 저장 실패. 실패한 장소만 다시 저장할 수 있습니다.\n${reason instanceof Error ? reason.message : "다시 시도해 주세요."}`);
+      } else {
+        discardDraft.current = true;
+        try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* optional storage */ }
+        alert(`${successfulIds.size}개의 장소가 저장되었습니다!`);
+        router.push("/saved");
       }
-
-      alert(`${selectedPlaces.length}개의 장소가 저장되었습니다!`);
-      router.push("/saved");
-    } catch (saveError) {
-      console.error("저장 중 오류 발생:", saveError);
-      alert(saveError instanceof Error ? saveError.message : "장소 저장에 실패했습니다.");
     } finally {
+      saveInFlight.current = false;
       setIsSaving(false);
     }
   };
@@ -207,7 +238,9 @@ export default function AddPage() {
 
             <div className="flex flex-col gap-3">
               <textarea
+                disabled={!draftReady || draftOwner !== userId || sessionStatus === "loading"}
                 value={url}
+                maxLength={10_000}
                 onChange={(event) => setUrl(event.target.value)}
                 placeholder="어니언 성수, 서울 성동구 아차산로9길 8..."
                 className="w-full h-32 p-4 text-base bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder-gray-400 shadow-sm resize-none"
@@ -215,7 +248,7 @@ export default function AddPage() {
 
               <button
                 onClick={handleExtract}
-                disabled={isLoading || !url.trim()}
+                disabled={!draftReady || isLoading || !url.trim()}
                 className="w-full h-[52px] flex items-center justify-center gap-2 bg-primary text-white rounded-xl text-[16px] font-bold transition-all active:scale-[0.98] shadow-[0_8px_16px_rgba(255,90,95,0.25)] disabled:bg-gray-300 disabled:text-gray-500 disabled:shadow-none disabled:active:scale-100"
               >
                 {isLoading ? "분석 중..." : "AI 분석하기"}
@@ -283,7 +316,7 @@ export default function AddPage() {
             <div className="min-h-0 flex-1 overflow-y-auto flex flex-col gap-3 custom-scrollbar pr-1 pb-4">
               {places.map((place, index) => (
                 <div
-                  key={`${place.name}-${index}`}
+                  key={place.request_id}
                   onClick={() => togglePlace(index)}
                   className={`p-4 rounded-2xl flex items-center gap-4 cursor-pointer transition-all border ${
                     place.selected
@@ -300,7 +333,7 @@ export default function AddPage() {
                   </div>
                   <div className="flex-1 overflow-hidden">
                     <h3 className={`font-bold truncate ${place.selected ? "text-text-primary" : "text-gray-600"}`}>
-                      {place.name}
+                      {place.name}{place.saved ? " · 저장 완료" : ""}
                     </h3>
                     <p className="text-xs text-text-secondary truncate mt-1">
                       {place.address || "주소 정보 없음"}
@@ -338,10 +371,10 @@ export default function AddPage() {
             <div className="shrink-0 border-t border-black/5 bg-background/95 pt-3 pb-2">
               <button
                 onClick={handleSave}
-                disabled={isSaving}
+                disabled={!draftReady || sessionStatus === "loading" || isSaving || !places.some(place => place.selected && !place.saved)}
                 className="w-full h-[52px] flex items-center justify-center bg-primary text-white rounded-xl text-[16px] font-bold active:scale-[0.98] shadow-[0_8px_16px_rgba(255,90,95,0.25)] disabled:bg-gray-300 disabled:text-gray-500 disabled:shadow-none disabled:active:scale-100"
               >
-                {isSaving ? "저장 중..." : `모두 저장 (${places.filter((place) => place.selected).length})`}
+                {isSaving ? "저장 중..." : !userId ? "로그인하고 저장 이어하기" : `선택 저장 (${places.filter((place) => place.selected && !place.saved).length})`}
               </button>
             </div>
           </motion.div>

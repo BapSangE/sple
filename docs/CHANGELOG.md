@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### 2026-09-15 — 사용자 격리 및 분석·저장 안정화
+- 좌표 복구를 세션 사용자로 제한하고, 내부 키 누락 시 인증을 차단.
+- AI 비동기 호출, 구조화된 결과 검증, 오류 구분, 시간·동시성·요청량 제한 추가.
+- 저장 요청 ID 기반 중복 요청 방지, 부분 실패 재시도, 로그인 전후 초안 복원 추가.
+- 네이버 주소 기반 매칭, 메타데이터 만료 및 수정 시 초기화, 지오코딩 시간 제한 추가.
+- 회귀 테스트와 PR CI 추가. 적용 순서와 검증 범위는 [[2026-09-15_RELIABILITY]] 참고.
+
 ### Added
 - 2026-05-15: 실서비스 진행 문서 추가 (`docs/PRODUCTION_READINESS_PROGRESS.md`)
 - 2026-05-15: Vercel API 프록시 라우트 추가 (`frontend/src/app/api/analyze/route.ts`, `frontend/src/app/api/places/route.ts`)

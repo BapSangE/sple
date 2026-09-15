@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { backendHeaders, backendUrl } from "@/lib/backend";
 
 interface PlaceBody {
+  request_id?: string;
   name?: string;
   address?: string;
   category?: string;
@@ -107,6 +108,7 @@ export async function POST(request: Request) {
       headers: backendHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         user_id: userId,
+        request_id: body.request_id,
         name: body.name.trim(),
         address: body.address?.trim() || "",
         category: body.category,

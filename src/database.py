@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base, Mapped, mapped_column
-from sqlalchemy import DateTime, Integer, String, Float, Text, text
+from sqlalchemy import DateTime, Integer, String, Float, Text, text, Index
 import os
 from dotenv import load_dotenv
 
@@ -25,6 +25,9 @@ Base = declarative_base()
 
 class Place(Base):
     __tablename__ = "places"
+    __table_args__ = (Index("uq_places_user_request", "user_id", "request_id", unique=True),)
+
+    request_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[str] = mapped_column(String, index=True) # Google Auth user ID
@@ -55,6 +58,7 @@ async def init_db():
             result = await conn.execute(text("PRAGMA table_info(places)"))
             existing_columns = {row[1] for row in result.fetchall()}
             columns = {
+                "request_id": "VARCHAR(36)",
                 "naver_place_title": "TEXT",
                 "naver_place_url": "TEXT",
                 "naver_category": "TEXT",
@@ -72,6 +76,8 @@ async def init_db():
                     await conn.execute(
                         text(f"ALTER TABLE places ADD COLUMN {column_name} {column_type}")
                     )
+
+            await conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_places_user_request ON places (user_id, request_id)"))
 
 async def get_db():
     async with async_session() as session:

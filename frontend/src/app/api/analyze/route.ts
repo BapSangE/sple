@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { backendHeaders, backendUrl } from "@/lib/backend";
 
 interface AnalyzeBody {
-  text?: string;
+  text?: unknown;
 }
 
 async function forwardBackendJson(response: Response) {
@@ -15,7 +15,7 @@ async function forwardBackendJson(response: Response) {
         code: "BACKEND_EMPTY_RESPONSE",
         message: `장소 분석 서버가 빈 응답을 반환했습니다. (HTTP ${response.status})`,
       },
-      { status: response.status || 502 },
+      { status: response.ok ? 502 : response.status },
     );
   }
 
@@ -33,7 +33,7 @@ async function forwardBackendJson(response: Response) {
         code: "BACKEND_BAD_RESPONSE",
         message: `장소 분석 서버 응답을 처리하지 못했습니다. (HTTP ${response.status})`,
       },
-      { status: response.status || 502 },
+      { status: response.ok ? 502 : response.status },
     );
   }
 }
@@ -54,14 +54,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const text = body.text?.trim();
+  const text = typeof body?.text === "string" ? body.text.trim() : "";
 
-  if (!text) {
+  if (!text || text.length > 10_000) {
     return NextResponse.json(
       {
         status: "error",
         code: "TEXT_REQUIRED",
-        message: "장소가 언급된 텍스트를 복사해 붙여넣어 주세요.",
+        message: "장소가 언급된 텍스트를 10,000자 이내로 붙여넣어 주세요.",
       },
       { status: 400 },
     );
@@ -72,10 +72,11 @@ export async function POST(request: Request) {
       method: "POST",
       headers: backendHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ text }),
+      signal: AbortSignal.timeout(30_000),
       cache: "no-store",
     });
 
-    return forwardBackendJson(response);
+    return await forwardBackendJson(response);
   } catch {
     return NextResponse.json(
       {

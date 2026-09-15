@@ -27,16 +27,16 @@ async def test_health_endpoints():
     assert db_response.json()["status"] == "ok"
 
 @pytest.mark.asyncio
-async def test_analyze_endpoint():
+async def test_analyze_endpoint(monkeypatch):
+    from unittest.mock import AsyncMock
+    monkeypatch.setattr("main.extract_place_info", AsyncMock(return_value=[{"name": "어니언", "address": ""}]))
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
         data = {"text": "성수동 어니언"}
         response = await ac.post("/api/analyze", json=data)
         assert response.status_code == 200
         json_data = response.json()
         assert json_data["status"] == "success"
-        if json_data["data"]:
-            assert isinstance(json_data["data"], list)
-            assert "name" in json_data["data"][0]
+        assert json_data["data"] == [{"name": "어니언", "address": ""}]
 
 
 @pytest.mark.asyncio

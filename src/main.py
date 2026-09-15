@@ -1,21 +1,23 @@
 from contextlib import asynccontextmanager
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 import os
 import logging
 from dotenv import load_dotenv
 from google import genai
-import json
-import re
+import secrets
+from uuid import UUID
 from pathlib import Path
 from typing import Optional
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text as sql_text
+from sqlalchemy.exc import IntegrityError
+from ai_extraction import extract_places, MAX_TEXT_LENGTH
 from database import get_db, init_db, Place as DBPlace
 from naver_place_search import search_naver_local_place
 
@@ -92,6 +94,7 @@ def init_gemini_client():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    validate_security_configuration()
     init_gemini_client()
     await init_db()
     yield
@@ -107,13 +110,14 @@ app.add_middleware(
 )
 
 class AnalyzeRequest(BaseModel):
-    text: str
+    text: str = Field(min_length=1, max_length=MAX_TEXT_LENGTH)
 
 class PlaceItem(BaseModel):
     user_id: str
     name: str
     address: str = ""
     category: str = "All"
+    request_id: Optional[UUID] = None
     rating: Optional[float] = None
     summary: Optional[str] = None
     latitude: Optional[float] = None
@@ -180,35 +184,7 @@ def serialize_place(place: DBPlace) -> dict:
 
 
 async def extract_place_info(text: str):
-    if not client:
-        return None
-    prompt = (
-        "당신은 한국 맛집/장소 텍스트에서 장소 정보를 추출하는 AI입니다. "
-        "사용자가 복사해 붙여넣은 텍스트에서 상호명과 주소를 JSON 배열로 추출하세요. "
-        "주소가 명확히 없더라도 상호명이 있으면 포함하고 address는 빈 문자열로 두세요. "
-        "반드시 다른 설명 없이 JSON 배열만 반환하세요. "
-        '형식: [{"name":"상호명","address":"주소 또는 빈 문자열"}]. '
-        f"텍스트: {text}"
-    )
-    prompt = (
-        "You extract Korean place/restaurant information from pasted social text. "
-        "Return only a valid JSON array with no markdown or explanation. "
-        "Each item must use this schema: "
-        '{"name":"store or place name","address":"address or empty string",'
-        '"category":"Dining|Cafe|Bar|Place","summary":"short Korean feature summary"}. '
-        "Rules: name is required; address can be empty if missing; "
-        "category should be the closest one of Dining, Cafe, Bar, Place; "
-        "summary must be Korean and explain the key features from the text in 80 characters or less "
-        "(menu, mood, price/event, recommendation reason). "
-        f"Text: {text}"
-    )
-    try:
-        response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-        match = re.search(r'\[.*\]', response.text, re.DOTALL)
-        if match: return json.loads(match.group())
-    except Exception as e:
-        logger.error(f"AI Error: {e}")
-    return None
+    return await extract_places(client, text)
 
 
 def normalize_text_input(text: str) -> str:
@@ -269,9 +245,25 @@ async def geocode_address_via_naver_api(address: str) -> tuple[Optional[float], 
     return None, None
 
 
+def development_auth_bypass() -> bool:
+    return (
+        os.getenv("APP_ENV", "production") == "development"
+        and os.getenv("ALLOW_INSECURE_LOCAL_AUTH") == "true"
+    )
+
+
+def validate_security_configuration():
+    if not BACKEND_API_KEY and not development_auth_bypass():
+        raise RuntimeError("BACKEND_API_KEY must be configured")
+
+
 async def verify_internal_api_key(x_sple_internal_key: Optional[str] = Header(default=None)):
-    if BACKEND_API_KEY and x_sple_internal_key != BACKEND_API_KEY:
-        raise HTTPException(status_code=401, detail={"code": "UNAUTHORIZED"})
+    if not BACKEND_API_KEY:
+        if development_auth_bypass():
+            return
+        raise HTTPException(503, detail={"code": "AUTH_NOT_CONFIGURED"})
+    if not secrets.compare_digest(x_sple_internal_key or "", BACKEND_API_KEY):
+        raise HTTPException(401, detail={"code": "UNAUTHORIZED"})
 
 @app.get("/")
 async def read_root():
@@ -313,6 +305,14 @@ async def create_place_api(
     db: AsyncSession = Depends(get_db),
     _: None = Depends(verify_internal_api_key),
 ):
+    request_id = str(place.request_id) if place.request_id else None
+    if request_id:
+        existing = await db.scalar(select(DBPlace).where(
+            DBPlace.user_id == place.user_id, DBPlace.request_id == request_id
+        ))
+        if existing:
+            return JSONResponse(content={"status": "success", "data": serialize_place(existing)})
+
     lat = place.latitude
     lng = place.longitude
     status = place.geocoding_status
@@ -334,6 +334,7 @@ async def create_place_api(
             status = "failed"
 
     db_place = DBPlace(
+        request_id=request_id,
         user_id=place.user_id,
         name=place.name,
         address=place.address,
@@ -345,7 +346,18 @@ async def create_place_api(
         geocoding_status=status,
     )
     db.add(db_place)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        if not request_id:
+            raise
+        existing = await db.scalar(select(DBPlace).where(
+            DBPlace.user_id == place.user_id, DBPlace.request_id == request_id
+        ))
+        if existing is None:
+            raise
+        return JSONResponse(content={"status": "success", "data": serialize_place(existing)})
     await db.refresh(db_place)
     return JSONResponse(content={"status": "success", "data": serialize_place(db_place)})
 
@@ -403,6 +415,11 @@ async def update_place_api(
         else:
             status = "failed"
 
+    if db_place.name != place.name or db_place.address != place.address:
+        for column in DBPlace.__table__.columns:
+            if column.name.startswith("naver_"):
+                setattr(db_place, column.name, None)
+
     db_place.name = place.name
     db_place.address = place.address
     db_place.category = place.category
@@ -436,8 +453,13 @@ async def enrich_place_api(
         raise HTTPException(status_code=404, detail={"code": "PLACE_NOT_FOUND"})
 
     cacheable_naver_statuses = {"matched", "low_confidence", "not_found"}
+    enriched_at = db_place.naver_enriched_at
+    if enriched_at and enriched_at.tzinfo is None:
+        enriched_at = enriched_at.replace(tzinfo=timezone.utc)
+    cache_ttl = timedelta(days=7) if db_place.naver_match_status == "matched" else timedelta(hours=1)
     if (
-        db_place.naver_enriched_at
+        enriched_at
+        and datetime.now(timezone.utc) - enriched_at < cache_ttl
         and db_place.naver_match_status in cacheable_naver_statuses
         and not payload.force
     ):
@@ -491,19 +513,21 @@ async def delete_place_api(
 
 @app.post("/api/places/recover-coordinates")
 async def recover_coordinates_api(
+    payload: PlaceEnrichRequest,
     db: AsyncSession = Depends(get_db),
     _: None = Depends(verify_internal_api_key),
 ):
     """
     서버사이드(Server-Side)에 누락되거나 지오코딩 실패('failed') 상태인
     과거 등록 맛집 데이터들의 위도/경도 좌표를 일괄적(Bulk)으로 복구하고 원격 DB에 저장합니다.
-    이 API는 내부 보안 키(x-sple-internal-key)에 의해 엄격히 보호됩니다.
+    내부 키와 프록시가 전달한 인증 사용자 범위로 보호됩니다.
     """
     logger.info("원격 데이터베이스 누락 좌표 일괄 복구 API 작동 시작")
     
     # 1. 위도/경도가 누락되었거나 지오코딩 실패('failed') 혹은 미처리('pending') 상태인 레코드들을 DB에서 조회
     result = await db.execute(
         select(DBPlace).where(
+            DBPlace.user_id == payload.user_id,
             (DBPlace.latitude == None) | 
             (DBPlace.longitude == None) | 
             (DBPlace.geocoding_status == "failed") |
@@ -552,7 +576,7 @@ async def recover_coordinates_api(
             logger.warning(f"장소 ID {place.id} 복구 실패 (네이버 API 응답 없음 혹은 주소 오기재)")
 
     # 3. 데이터베이스 트랜잭션 반영 및 커밋(Commit)
-    if recovered_count > 0:
+    if target_places:
         await db.commit()
         logger.info(f"총 {recovered_count}개의 맛집 좌표가 원격 DB에 성공적으로 저장되었습니다.")
     

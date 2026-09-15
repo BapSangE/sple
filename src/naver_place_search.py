@@ -63,6 +63,26 @@ def _to_text(value: Any) -> str | None:
     return str(value)
 
 
+def _address_tokens(value: str | None) -> set[str]:
+    text = value or ""
+    for long, short in [("서울특별시", "서울"), ("부산광역시", "부산"),
+                        ("대구광역시", "대구"), ("인천광역시", "인천"),
+                        ("광주광역시", "광주"), ("대전광역시", "대전"),
+                        ("울산광역시", "울산"), ("경기도", "경기")]:
+        text = text.replace(long, short)
+    return {token for part in text.split() if (token := _normalize(part))}
+
+
+def _address_score(address: str | None, item: dict) -> float:
+    expected = _address_tokens(address)
+    if not expected:
+        return 0
+    return max(
+        len(expected & _address_tokens(item.get(field))) / len(expected)
+        for field in ("address", "roadAddress")
+    )
+
+
 def search_naver_local_place(name: str, address: str | None = None) -> NaverPlaceMetadata:
     client_id = os.getenv("NAVER_SEARCH_CLIENT_ID")
     client_secret = os.getenv("NAVER_SEARCH_CLIENT_SECRET")
@@ -88,20 +108,24 @@ def search_naver_local_place(name: str, address: str | None = None) -> NaverPlac
     except httpx.HTTPError:
         return _empty_metadata("api_error")
 
-    items: list[dict[str, Any]] = response.json().get("items", [])
+    try:
+        items = response.json().get("items", [])
+        if not isinstance(items, list) or any(not isinstance(item, dict) for item in items):
+            return _empty_metadata("api_error")
+    except (ValueError, AttributeError):
+        return _empty_metadata("api_error")
     if not items:
         return _empty_metadata("not_found")
 
     normalized_name = _normalize(name)
-    selected = items[0]
+    candidates = [item for item in items if normalized_name and
+                  normalized_name in _normalize(_strip_tags(item.get("title")))]
+    selected = max(candidates or items, key=lambda item: _address_score(address, item))
     match_status = "low_confidence"
-
-    for item in items:
-        title = _strip_tags(item.get("title"))
-        if normalized_name and normalized_name in _normalize(title):
-            selected = item
+    if candidates and len(_address_tokens(address)) >= 2 and _address_score(address, selected) == 1:
+        # Require a unique address match: a generic brand name alone cannot identify a branch.
+        if sum(_address_score(address, item) == 1 for item in candidates) == 1:
             match_status = "matched"
-            break
 
     return NaverPlaceMetadata(
         title=_strip_tags(selected.get("title")),
