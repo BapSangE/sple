@@ -8,16 +8,15 @@ from pydantic import BaseModel, Field, field_validator
 import os
 import logging
 from dotenv import load_dotenv
-from google import genai
+from openai import AsyncOpenAI
 import secrets
 from uuid import UUID
-from pathlib import Path
 from typing import Optional
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text as sql_text
 from sqlalchemy.exc import IntegrityError
-from ai_extraction import extract_places, MAX_TEXT_LENGTH
+from ai_extraction import extract_places, MAX_TEXT_LENGTH, AI_TIMEOUT_SECONDS
 from database import get_db, init_db, Place as DBPlace
 from naver_place_search import search_naver_local_place
 
@@ -29,10 +28,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # 환경 변수 설정
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GCP_SA_KEY_JSON = os.getenv("GCP_SA_KEY_JSON")
-GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "insta-place-493505")
-GCP_LOCATION = os.getenv("GCP_LOCATION", "us-central1")
 FB_VERIFY_TOKEN = os.getenv("FB_VERIFY_TOKEN", "sple_default_token")
 IG_PAGE_ACCESS_TOKEN = os.getenv("IG_PAGE_ACCESS_TOKEN")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://sple-insta.com")
@@ -46,58 +41,31 @@ ALLOWED_ORIGINS = [
     if origin.strip()
 ]
 
-# Gemini 클라이언트 초기화
+# NVIDIA credentials are backend-only.
 client = None
 
-def init_gemini_client():
+
+def init_nvidia_client():
     global client
-    # 1. GitHub Actions/ECS 환경 변수 방식 (JSON 문자열)
-    if GCP_SA_KEY_JSON:
-        try:
-            logger.info("GCP_SA_KEY_JSON 환경 변수를 사용하여 Vertex AI 초기화를 시도합니다.")
-            temp_key_path = Path("/tmp/gcp-key.json")
-            if not temp_key_path.parent.exists():
-                temp_key_path.parent.mkdir(parents=True, exist_ok=True)
-            temp_key_path.write_text(GCP_SA_KEY_JSON)
-            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(temp_key_path)
-            client = genai.Client(vertexai=True, project=GCP_PROJECT_ID, location=GCP_LOCATION)
-            logger.info("Vertex AI 초기화 성공 (JSON String)")
-            return
-        except Exception as e:
-            logger.error(f"Vertex AI(JSON String) 초기화 실패: {e}")
+    api_key = os.getenv("NVIDIA_API_KEY", "").strip()
+    client = AsyncOpenAI(
+        base_url="https://integrate.api.nvidia.com/v1",
+        api_key=api_key,
+        timeout=AI_TIMEOUT_SECONDS,
+        max_retries=0,
+    ) if api_key else None
 
-    # 2. 로컬 파일 방식 (insta-place-gcp.json)
-    sa_path = Path("insta-place-gcp.json")
-    if not sa_path.is_absolute():
-        root_dir = Path(__file__).resolve().parent.parent
-        sa_path = root_dir / sa_path
-        
-    if sa_path.exists():
-        try:
-            logger.info(f"로컬 파일 {sa_path}을 사용하여 Vertex AI 초기화를 시도합니다.")
-            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(sa_path)
-            client = genai.Client(vertexai=True, project=GCP_PROJECT_ID, location=GCP_LOCATION)
-            logger.info("Vertex AI 초기화 성공 (Local File)")
-            return
-        except Exception as e:
-            logger.error(f"Vertex AI(Local File) 초기화 실패: {e}")
-
-    # 3. API Key 방식 (Fallback)
-    if GEMINI_API_KEY:
-        try:
-            logger.info("Gemini API Key를 사용하여 클라이언트를 초기화합니다.")
-            client = genai.Client(api_key=GEMINI_API_KEY)
-            logger.info("Gemini API Key 클라이언트 초기화 성공")
-            return
-        except Exception as e:
-            logger.error(f"Gemini API Key 초기화 실패: {e}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     validate_security_configuration()
-    init_gemini_client()
-    await init_db()
-    yield
+    init_nvidia_client()
+    try:
+        await init_db()
+        yield
+    finally:
+        if client is not None:
+            await client.close()
 
 app = FastAPI(title="Sple Reboot API", lifespan=lifespan)
 

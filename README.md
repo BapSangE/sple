@@ -89,7 +89,7 @@ flowchart LR
 | Frontend | Next.js App Router, React 19, TypeScript 5, Tailwind CSS v4 |
 | Backend | FastAPI, Python 3.12, Pydantic, SQLAlchemy Async |
 | Database | Supabase PostgreSQL, SQLite local fallback |
-| AI | Google Gemini 2.5 Flash / Vertex AI, `google-genai` |
+| AI | NVIDIA Nemotron 3 Ultra, `openai` Async SDK |
 | Map | Naver Maps JavaScript API, Naver Geocoding API |
 | Place Metadata | Naver Search Local API |
 | Auth | NextAuth, Google OAuth |
@@ -110,7 +110,7 @@ flowchart TD
   PlacesRoute --> Backend
   EnrichRoute --> Backend
 
-  Backend --> Gemini["Google Gemini"]
+  Backend --> NVIDIA["NVIDIA Nemotron 3 Ultra"]
   Backend --> DB["Supabase PostgreSQL"]
   Backend --> NaverSearch["Naver Search Local API"]
   Backend --> NaverGeocode["Naver Geocoding API"]
@@ -166,10 +166,7 @@ BACKEND_API_KEY=...
 FRONTEND_URL=https://www.sple-insta.com
 ALLOWED_ORIGINS=https://www.sple-insta.com,https://sple-insta.com
 
-GEMINI_API_KEY=...
-GCP_SA_KEY_JSON=...
-GCP_PROJECT_ID=...
-GCP_LOCATION=...
+NVIDIA_API_KEY=...
 
 NEXT_PUBLIC_NAVER_CLIENT_ID=...
 NAVER_CLIENT_SECRET=...
@@ -297,7 +294,7 @@ AWS_SECRET_ACCESS_KEY
 DATABASE_URL
 BACKEND_API_KEY
 FRONTEND_URL
-GCP_SA_KEY_JSON
+NVIDIA_API_KEY
 GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET
 NEXTAUTH_SECRET
@@ -326,3 +323,13 @@ BACKEND_HEALTH_URL
 - AI 분석, geocoding, Naver enrichment 실패율 모니터링
 - 사용자 현재 위치와 멀리 떨어진 장소를 더 쉽게 찾는 지도 UX 개선
 
+
+## NVIDIA 장소 분석 설정
+
+- 모델: `nvidia/nemotron-3-ultra-550b-a55b`, 엔드포인트: `https://integrate.api.nvidia.com/v1`.
+- 로컬은 저장소 루트 `.env`에 `NVIDIA_API_KEY`를 설정한 뒤 백엔드를 재시작합니다.
+- 운영은 GitHub Actions repository secret `NVIDIA_API_KEY`를 등록하고 백엔드를 배포합니다. Vercel이나 `NEXT_PUBLIC_` 변수에는 넣지 않습니다.
+- 기존 Gemini/Vertex 키는 AI 분석에 사용하지 않습니다. Google 로그인 설정은 그대로 필요합니다.
+- 추론 비활성화, 비스트리밍 비동기 호출, 전체 25초 제한 및 SDK 자동 재시도 비활성화로 기존 API 응답 계약을 유지합니다.
+- JSON 배열을 프롬프트로 요청하고 서버에서 검증합니다. 잘린 응답/잘못된 JSON은 오류로 처리합니다.
+- 키가 없으면 분석은 503을 반환합니다. 실제 모델 품질과 지연은 키 등록 후 확인해야 합니다.

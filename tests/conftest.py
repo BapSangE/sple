@@ -25,12 +25,6 @@ def setup_env(monkeypatch):
     analysis_limiter.active = 0
     for key in ("NEXT_PUBLIC_NAVER_CLIENT_ID", "NAVER_CLIENT_SECRET", "NAVER_SEARCH_CLIENT_ID", "NAVER_SEARCH_CLIENT_SECRET"):
         monkeypatch.delenv(key, raising=False)
-    # 테스트 환경을 위한 인스타-GCP 서비스 계정 환경 변수 자동 설정
-    root_dir = Path(__file__).resolve().parent.parent
-    sa_path = root_dir / "insta-place-gcp.json"
-    if sa_path.exists():
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(sa_path)
-
 @pytest.fixture(scope="session", autouse=True)
 def cleanup_test_db():
     yield
