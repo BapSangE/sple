@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 interface AdBannerProps {
-  dataAdSlot: string;
+  dataAdSlot?: string;
   dataAdFormat?: string;
   dataFullWidthResponsive?: boolean;
 }
@@ -13,7 +13,17 @@ export default function AdBanner({
   dataAdFormat = "auto",
   dataFullWidthResponsive = true,
 }: AdBannerProps) {
+  const adSlot = dataAdSlot?.trim();
+  const adClient = process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID?.trim();
+  const isConfigured = Boolean(
+    adClient && adSlot && adSlot !== "1234567890" && /^\d{10}$/.test(adSlot),
+  );
+
   useEffect(() => {
+    if (!isConfigured || process.env.NODE_ENV === "development") {
+      return;
+    }
+
     try {
       // 컴포넌트가 마운트될 때 구글 광고 스크립트 실행
       // @ts-expect-error adsbygoogle is injected by the AdSense script.
@@ -21,7 +31,11 @@ export default function AdBanner({
     } catch (err) {
       console.error("AdSense Error:", err);
     }
-  }, []);
+  }, [isConfigured]);
+
+  if (!isConfigured) {
+    return null;
+  }
 
   // 개발 환경에서는 광고 영역을 시각적으로 보여줍니다.
   if (process.env.NODE_ENV === "development") {
@@ -37,8 +51,8 @@ export default function AdBanner({
       <ins
         className="adsbygoogle"
         style={{ display: "block" }}
-        data-ad-client={process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID}
-        data-ad-slot={dataAdSlot}
+        data-ad-client={adClient}
+        data-ad-slot={adSlot}
         data-ad-format={dataAdFormat}
         data-full-width-responsive={dataFullWidthResponsive.toString()}
       />

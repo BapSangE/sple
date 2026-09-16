@@ -54,6 +54,83 @@ async def test_failed_recovery_status_is_committed(api, monkeypatch):
     assert places[0]['geocoding_status'] == 'failed'
 
 
+async def test_recovery_uses_unique_local_search_coordinates_without_crossing_users(api, monkeypatch):
+    from naver_place_search import _empty_metadata
+    owner, other = str(uuid4()), str(uuid4())
+    for user_id in (owner, other):
+        await api.post('/api/places', json={
+            'user_id': user_id, 'name': '버터앤쉘터', 'address': '용산 아이파크몰'
+        })
+    result = _empty_metadata('matched')
+    result.mapx = '1269873882'
+    result.mapy = '375666103'
+    monkeypatch.setattr(main, 'search_naver_local_place', lambda name, address: result)
+
+    response = await api.post('/api/places/recover-coordinates', json={'user_id': owner})
+
+    assert response.json()['data']['recovered_count'] == 1
+    owner_place = (await api.get('/api/places', params={'user_id': owner})).json()['data'][0]
+    other_place = (await api.get('/api/places', params={'user_id': other})).json()['data'][0]
+    assert owner_place['latitude'] == pytest.approx(37.5666103)
+    assert owner_place['longitude'] == pytest.approx(126.9873882)
+    assert other_place['latitude'] is None
+
+
+@pytest.mark.parametrize('mapx, mapy', [
+    ('not-a-number', '375666103'),
+    ('1810000000', '375666103'),
+    ('1269873882', '910000000'),
+    ('311277', '552097'),
+    ('0', '0'),
+])
+async def test_local_search_invalid_coordinates_are_rejected(monkeypatch, mapx, mapy):
+    from naver_place_search import _empty_metadata
+    result = _empty_metadata('matched')
+    result.mapx = mapx
+    result.mapy = mapy
+    monkeypatch.setattr(main, 'search_naver_local_place', lambda name, address: result)
+
+    assert await main.resolve_place_coordinates('버터앤쉘터', '용산 아이파크몰') == (None, None)
+
+
+async def test_local_search_low_confidence_coordinates_are_rejected(monkeypatch):
+    from naver_place_search import _empty_metadata
+    result = _empty_metadata('low_confidence')
+    result.mapx = '1269873882'
+    result.mapy = '375666103'
+    monkeypatch.setattr(main, 'search_naver_local_place', lambda name, address: result)
+
+    assert await main.resolve_place_coordinates('버터앤쉘터', '용산 아이파크몰') == (None, None)
+
+
+async def test_create_and_update_use_local_search_coordinate_fallback(api, monkeypatch):
+    from naver_place_search import _empty_metadata
+    monkeypatch.setenv('NAVER_SEARCH_CLIENT_ID', 'client')
+    monkeypatch.setenv('NAVER_SEARCH_CLIENT_SECRET', 'secret')
+    coordinates = iter([('1269873882', '375666103'), ('1290756416', '351798863')])
+
+    def search(name, address):
+        result = _empty_metadata('matched')
+        result.mapx, result.mapy = next(coordinates)
+        return result
+
+    monkeypatch.setattr(main, 'search_naver_local_place', search)
+    user = str(uuid4())
+    created = await api.post('/api/places', json={
+        'user_id': user, 'name': '버터앤쉘터', 'address': '용산 아이파크몰'
+    })
+    place_id = created.json()['data']['id']
+    assert created.json()['data']['latitude'] == pytest.approx(37.5666103)
+    assert created.json()['data']['geocoding_status'] == 'resolved'
+
+    updated = await api.patch(f'/api/places/{place_id}', json={
+        'user_id': user, 'name': '테스트카페', 'address': '부산 해운대구'
+    })
+    assert updated.json()['data']['latitude'] == pytest.approx(35.1798863)
+    assert updated.json()['data']['longitude'] == pytest.approx(129.0756416)
+    assert updated.json()['data']['geocoding_status'] == 'resolved'
+
+
 async def test_save_retries_and_concurrent_requests_do_not_duplicate(api):
     user = str(uuid4())
     payload = {'user_id': user, 'name': '카페', 'request_id': str(uuid4())}

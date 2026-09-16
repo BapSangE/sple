@@ -73,14 +73,20 @@ def _address_tokens(value: str | None) -> set[str]:
     return {token for part in text.split() if (token := _normalize(part))}
 
 
-def _address_score(address: str | None, item: dict) -> float:
+def _location_score(address: str | None, item: dict) -> float:
     expected = _address_tokens(address)
     if not expected:
         return 0
-    return max(
-        len(expected & _address_tokens(item.get(field))) / len(expected)
-        for field in ("address", "roadAddress")
+    searchable = {
+        token
+        for field in ("title", "address", "roadAddress")
+        for token in _address_tokens(_strip_tags(item.get(field)))
+    }
+    matched = sum(
+        token in searchable if token.isdigit() else any(token in value for value in searchable)
+        for token in expected
     )
+    return matched / len(expected)
 
 
 def search_naver_local_place(name: str, address: str | None = None) -> NaverPlaceMetadata:
@@ -120,11 +126,12 @@ def search_naver_local_place(name: str, address: str | None = None) -> NaverPlac
     normalized_name = _normalize(name)
     candidates = [item for item in items if normalized_name and
                   normalized_name in _normalize(_strip_tags(item.get("title")))]
-    selected = max(candidates or items, key=lambda item: _address_score(address, item))
+    selected = max(candidates or items, key=lambda item: _location_score(address, item))
     match_status = "low_confidence"
-    if candidates and len(_address_tokens(address)) >= 2 and _address_score(address, selected) == 1:
-        # Require a unique address match: a generic brand name alone cannot identify a branch.
-        if sum(_address_score(address, item) == 1 for item in candidates) == 1:
+    if candidates and len(_address_tokens(address)) >= 2 and _location_score(address, selected) == 1:
+        # The name and every location token must identify exactly one result. Location text may
+        # be a landmark in the title rather than a postal address.
+        if sum(_location_score(address, item) == 1 for item in candidates) == 1:
             match_status = "matched"
 
     return NaverPlaceMetadata(

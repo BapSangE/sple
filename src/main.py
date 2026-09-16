@@ -178,7 +178,6 @@ async def geocode_address_via_naver_api(address: str) -> tuple[Optional[float], 
             "백엔드 서버사이드 지오코딩 폴백 작동을 건너뜁니다."
         )
         return None, None
-        
     url = "https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode"
     headers = {
         "X-NCP-APIGW-API-KEY-ID": client_id,
@@ -211,6 +210,37 @@ async def geocode_address_via_naver_api(address: str) -> tuple[Optional[float], 
         logger.error(f"서버사이드 지오코딩 요청 예외 발생: {e}")
         
     return None, None
+
+
+def _parse_naver_local_coordinates(mapx: str | None, mapy: str | None) -> tuple[Optional[float], Optional[float]]:
+    try:
+        lng = int(mapx or "") / 10_000_000
+        lat = int(mapy or "") / 10_000_000
+    except (TypeError, ValueError):
+        return None, None
+    # Naver local search covers Korean places; reject legacy KATECH values and
+    # malformed coordinates that happen to fit broad global WGS84 bounds.
+    if not (33 <= lat <= 39 and 124 <= lng <= 132):
+        return None, None
+    return lat, lng
+
+
+async def resolve_place_coordinates(name: str, address: str) -> tuple[Optional[float], Optional[float]]:
+    lat, lng = await geocode_address_via_naver_api(address)
+    if lat is not None and lng is not None:
+        return lat, lng
+
+    metadata = await asyncio.to_thread(search_naver_local_place, name, address)
+    if metadata.match_status != "matched":
+        return None, None
+    return _parse_naver_local_coordinates(metadata.mapx, metadata.mapy)
+
+
+def _has_coordinate_provider() -> bool:
+    return bool(
+        (os.getenv("NEXT_PUBLIC_NAVER_CLIENT_ID") and os.getenv("NAVER_CLIENT_SECRET"))
+        or (os.getenv("NAVER_SEARCH_CLIENT_ID") and os.getenv("NAVER_SEARCH_CLIENT_SECRET"))
+    )
 
 
 def development_auth_bypass() -> bool:
@@ -285,15 +315,9 @@ async def create_place_api(
     lng = place.longitude
     status = place.geocoding_status
 
-    # 백엔드 지오코딩에 필요한 네이버 API 키 환경 변수(Environment Variable) 존재 여부 검사
-    client_id = os.getenv("NEXT_PUBLIC_NAVER_CLIENT_ID")
-    client_secret = os.getenv("NAVER_CLIENT_SECRET")
-    has_naver_keys = bool(client_id and client_secret)
-
-    # 클라이언트가 좌표 변환에 실패했거나 좌표를 넘겨주지 않은 경우이면서, 주소가 있고, 네이버 API 키가 설정되어 있는 경우에만 서버사이드 지오코딩 폴백 작동
-    if has_naver_keys and (lat is None or lng is None or status == "failed") and place.address:
+    if _has_coordinate_provider() and (lat is None or lng is None or status == "failed") and place.address:
         logger.info(f"클라이언트 좌표 누락 감지, 백엔드 지오코딩 폴백 작동: {place.address}")
-        server_lat, server_lng = await geocode_address_via_naver_api(place.address)
+        server_lat, server_lng = await resolve_place_coordinates(place.name, place.address)
         if server_lat is not None and server_lng is not None:
             lat = server_lat
             lng = server_lng
@@ -367,15 +391,9 @@ async def update_place_api(
     lng = place.longitude
     status = place.geocoding_status
 
-    # 백엔드 지오코딩에 필요한 네이버 API 키 환경 변수(Environment Variable) 존재 여부 검사
-    client_id = os.getenv("NEXT_PUBLIC_NAVER_CLIENT_ID")
-    client_secret = os.getenv("NAVER_CLIENT_SECRET")
-    has_naver_keys = bool(client_id and client_secret)
-
-    # 주소가 존재하고 좌표 정보가 없는 경우이면서, 네이버 API 키가 설정되어 있는 경우에만 백엔드 지오코딩 폴백 작동
-    if has_naver_keys and (lat is None or lng is None or status == "failed") and place.address:
+    if _has_coordinate_provider() and (lat is None or lng is None or status == "failed") and place.address:
         logger.info(f"클라이언트 좌표 누락 감지, 백엔드 지오코딩 폴백 작동 (수정 API): {place.address}")
-        server_lat, server_lng = await geocode_address_via_naver_api(place.address)
+        server_lat, server_lng = await resolve_place_coordinates(place.name, place.address)
         if server_lat is not None and server_lng is not None:
             lat = server_lat
             lng = server_lng
@@ -524,7 +542,7 @@ async def recover_coordinates_api(
             continue
             
         logger.info(f"장소 ID {place.id} ({place.name})의 주소({place.address}) 좌표 복구 시도 중...")
-        lat, lng = await geocode_address_via_naver_api(place.address)
+        lat, lng = await resolve_place_coordinates(place.name, place.address)
         
         if lat is not None and lng is not None:
             place.latitude = lat

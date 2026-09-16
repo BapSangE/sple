@@ -116,3 +116,55 @@ def test_same_brand_requires_matching_region(monkeypatch, address, expected, sta
     result = search_naver_local_place("테스트카페", address)
     assert result.address == expected
     assert result.match_status == status
+
+
+def test_landmark_in_title_is_a_supported_unique_match(monkeypatch):
+    monkeypatch.setenv("NAVER_SEARCH_CLIENT_ID", "client")
+    monkeypatch.setenv("NAVER_SEARCH_CLIENT_SECRET", "secret")
+    class Response:
+        def raise_for_status(self): pass
+        def json(self):
+            return {"items": [
+                {"title": "버터앤쉘터 용산 아이파크몰점", "address": "서울 용산구 한강로3가"},
+                {"title": "버터앤쉘터 성수점", "address": "서울 성동구 성수동"},
+            ]}
+    monkeypatch.setattr("naver_place_search.httpx.get", lambda *args, **kwargs: Response())
+
+    result = search_naver_local_place("버터앤쉘터", "용산 아이파크몰")
+
+    assert result.title == "버터앤쉘터 용산 아이파크몰점"
+    assert result.match_status == "matched"
+
+
+def test_landmark_match_rejects_ambiguous_brand_results(monkeypatch):
+    monkeypatch.setenv("NAVER_SEARCH_CLIENT_ID", "client")
+    monkeypatch.setenv("NAVER_SEARCH_CLIENT_SECRET", "secret")
+    class Response:
+        def raise_for_status(self): pass
+        def json(self):
+            return {"items": [
+                {"title": "테스트카페 용산 아이파크몰 1호점"},
+                {"title": "테스트카페 용산 아이파크몰 2호점"},
+            ]}
+    monkeypatch.setattr("naver_place_search.httpx.get", lambda *args, **kwargs: Response())
+
+    result = search_naver_local_place("테스트카페", "용산 아이파크몰")
+
+    assert result.match_status == "low_confidence"
+
+
+def test_numeric_location_token_does_not_match_a_longer_street_number(monkeypatch):
+    monkeypatch.setenv("NAVER_SEARCH_CLIENT_ID", "client")
+    monkeypatch.setenv("NAVER_SEARCH_CLIENT_SECRET", "secret")
+    class Response:
+        def raise_for_status(self): pass
+        def json(self):
+            return {"items": [{
+                "title": "테스트카페 강남점",
+                "roadAddress": "서울 강남구 테헤란로 1234",
+            }]}
+    monkeypatch.setattr("naver_place_search.httpx.get", lambda *args, **kwargs: Response())
+
+    result = search_naver_local_place("테스트카페", "테헤란로 123")
+
+    assert result.match_status == "low_confidence"

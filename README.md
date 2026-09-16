@@ -150,7 +150,10 @@ BACKEND_API_URL=https://api.sple-insta.com
 BACKEND_API_KEY=...
 NEXT_PUBLIC_NAVER_CLIENT_ID=...
 NEXT_PUBLIC_ADSENSE_CLIENT_ID=...
+NEXT_PUBLIC_ADSENSE_SLOT=...
 ```
+
+`NEXT_PUBLIC_ADSENSE_SLOT` is injected into the client bundle at build time. Set it to a real AdSense slot ID and redeploy; leave it unset to hide the banner.
 
 주의:
 
@@ -333,3 +336,11 @@ BACKEND_HEALTH_URL
 - 추론 비활성화, 비스트리밍 비동기 호출, 전체 25초 제한 및 SDK 자동 재시도 비활성화로 기존 API 응답 계약을 유지합니다.
 - JSON 배열을 프롬프트로 요청하고 서버에서 검증합니다. 잘린 응답/잘못된 JSON은 오류로 처리합니다.
 - 키가 없으면 분석은 503을 반환합니다. 실제 모델 품질과 지연은 키 등록 후 확인해야 합니다.
+
+## 건물명 주소의 좌표 복구
+
+도로명/지번이 아닌 `용산 아이파크몰` 같은 주소는 주소 지오코딩 결과가 없을 수 있습니다. 저장·주소 수정·사용자 범위 좌표 복구에서 주소 변환이 실패하면 네이버 Local Search를 사용합니다. 이름과 위치가 한 후보에 명확히 일치할 때만 검색 좌표를 채택합니다. 후보가 불확실하면 주소를 직접 보완해야 합니다.
+
+백엔드에 `NAVER_SEARCH_CLIENT_ID`, `NAVER_SEARCH_CLIENT_SECRET`가 필요합니다. 지도용 Naver Cloud 키와 별개인 Naver Developers 검색 API 키이며, GitHub Actions Secrets 등록 후 백엔드를 재배포해야 합니다.
+
+기존 좌표 없는 장소는 배포 후 리스트 상세에서 `주소 저장`을 다시 실행하면 보완 처리가 적용됩니다. 검증되지 않은 위치로 기존 데이터를 일괄 변경하지 않습니다.

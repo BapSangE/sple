@@ -365,7 +365,7 @@ export default function AddPage() {
                 </div>
               ))}
 
-              <AdBanner dataAdSlot="1234567890" />
+              <AdBanner dataAdSlot={process.env.NEXT_PUBLIC_ADSENSE_SLOT} />
             </div>
 
             <div className="shrink-0 border-t border-black/5 bg-background/95 pt-3 pb-2">
