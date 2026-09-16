@@ -15,8 +15,8 @@ export default function DataDeletionPage() {
           <p className="text-sm leading-7">
             Sple 사용자는 서비스 이용 중 저장된 개인정보와 장소 데이터를 삭제
             요청할 수 있습니다. 삭제 대상에는 Google 로그인 계정 식별 정보,
-            저장된 장소 목록, 사용자가 붙여넣은 텍스트의 분석 기록이 포함될 수
-            있습니다.
+            저장된 장소 목록, 사용자가 붙여넣은 텍스트의 분석 기록, Instagram DM
+            공유로 생성된 임시 저장 링크와 식별 정보가 포함될 수 있습니다.
           </p>
         </section>
 

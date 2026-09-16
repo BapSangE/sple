@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base, Mapped, mapped_column
 from sqlalchemy import DateTime, Integer, String, Float, Text, text, Index
+from datetime import datetime, timezone
 import os
 from dotenv import load_dotenv
 
@@ -50,6 +51,22 @@ class Place(Base):
     naver_mapy: Mapped[str] = mapped_column(Text, nullable=True)
     naver_match_status: Mapped[str] = mapped_column(String, nullable=True)
     naver_enriched_at = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class InstagramShare(Base):
+    __tablename__ = "instagram_shares"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    claim_token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    sender_id: Mapped[str] = mapped_column(String(255), index=True)
+    source_url: Mapped[str] = mapped_column(Text, default="")
+    title: Mapped[str] = mapped_column(Text, default="")
+    places_json: Mapped[str] = mapped_column(Text, default="[]")
+    claimed_by_user_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
 
 async def init_db():
     async with engine.begin() as conn:

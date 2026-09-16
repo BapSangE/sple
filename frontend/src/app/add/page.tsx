@@ -33,6 +33,15 @@ interface ApiErrorResponse {
   };
 }
 
+interface InstagramClaimResponse {
+  status: string;
+  data?: {
+    title?: string;
+    source_url?: string;
+    places?: Array<Partial<Pick<Place, "name" | "address" | "category" | "summary">>>;
+  };
+}
+
 async function readErrorMessage(response: Response) {
   try {
     const data = (await response.json()) as ApiErrorResponse;
@@ -52,11 +61,13 @@ export default function AddPage() {
   const [places, setPlaces] = useState<Place[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<"input" | "loading" | "result">("input");
+  const [instagramClaimToken, setInstagramClaimToken] = useState<string | null>(null);
 
   const [draftReady, setDraftReady] = useState(false);
   const [draftOwner, setDraftOwner] = useState<string | null | undefined>(undefined);
   const saveInFlight = useRef(false);
   const discardDraft = useRef(false);
+  const instagramClaimLoaded = useRef(false);
 
   useEffect(() => {
     if (sessionStatus === "loading") return;
@@ -94,6 +105,55 @@ export default function AddPage() {
       // A login attempt explicitly checks persistence before navigating.
     }
   }, [draftReady, draftOwner, sessionStatus, url, places, userId]);
+
+  useEffect(() => {
+    if (sessionStatus === "loading" || instagramClaimLoaded.current) return;
+    const token = new URLSearchParams(window.location.search).get("claim");
+    if (!token) return;
+    if (!/^[A-Za-z0-9_-]{20,64}$/.test(token)) {
+      instagramClaimLoaded.current = true;
+      queueMicrotask(() => setError("Instagram 저장 링크가 올바르지 않습니다."));
+      return;
+    }
+    if (!userId) {
+      instagramClaimLoaded.current = true;
+      void signIn("google", { callbackUrl: `/add?claim=${encodeURIComponent(token)}` });
+      return;
+    }
+
+    instagramClaimLoaded.current = true;
+    queueMicrotask(() => {
+      setStep("loading");
+      setError(null);
+    });
+    void fetch(apiUrl(`/api/instagram/claims/${encodeURIComponent(token)}`), {
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        const data = (await response.json()) as InstagramClaimResponse & ApiErrorResponse;
+        if (!response.ok || data.status !== "success" || !data.data) {
+          throw new Error(data.message || "Instagram 저장 링크를 불러오지 못했습니다.");
+        }
+        const extractedPlaces = (data.data.places || [])
+          .map(normalizeAnalyzedPlace)
+          .filter((place): place is NonNullable<typeof place> => place !== null)
+          .map((place) => ({ ...place, request_id: crypto.randomUUID(), saved: false }));
+        setInstagramClaimToken(token);
+        setUrl(data.data.title?.trim() || "");
+        if (extractedPlaces.length) {
+          setPlaces(extractedPlaces);
+          setStep("result");
+          return;
+        }
+        setPlaces([]);
+        setError("게시물에서 장소 정보를 찾지 못했어요. 상호명이나 주소를 입력해 주세요.");
+        setStep("input");
+      })
+      .catch((claimError: unknown) => {
+        setError(claimError instanceof Error ? claimError.message : "Instagram 저장 링크를 불러오지 못했습니다.");
+        setStep("input");
+      });
+  }, [sessionStatus, userId]);
 
   const handleExtract = async () => {
     if (!url.trim() || isLoading) return;
@@ -186,6 +246,7 @@ export default function AddPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             request_id: place.request_id,
+            instagram_claim_token: instagramClaimToken || undefined,
             name: place.name, address: place.address || "",
             category: place.category, summary: place.summary,
             ...(place.address ? geocodingFieldsFromCoordinates(coordinates) : pendingGeocodingFields()),

@@ -4,9 +4,9 @@
 
 ### 2026-09-16 — Instagram DM 공유 웹훅 수신
 - Meta Webhooks 검증 GET과 `x-hub-signature-256` 검증 POST 엔드포인트 추가.
-- `ig_post` 공유 캡션을 Nemotron 분석으로 넘기고 중복 메시지를 한 번만 처리.
-- `INSTAGRAM_WEBHOOK_VERIFY_TOKEN`, `META_APP_SECRET` 운영 환경변수와 콜백 설정 문서화.
-- 발신자-로그인 계정 연결과 자동 저장은 실제 Meta payload 확인 후 후속 작업으로 남김.
+- `ig_post` 공유 정보를 Nemotron 분석으로 넘기고 중복 메시지를 한 번만 처리.
+- 7일 만료 저장 링크를 만들어 DM으로 답장하고, 링크를 연 로그인 사용자가 자신의 장소 목록에 저장하도록 구성.
+- `INSTAGRAM_WEBHOOK_VERIFY_TOKEN`, `META_APP_SECRET`, `IG_PAGE_ACCESS_TOKEN`, `INSTAGRAM_BUSINESS_ACCOUNT_ID` 운영 환경변수와 콜백 설정 문서화.
 
 ### 2026-09-16 — 건물명 주소 좌표 복구와 광고 설정
 - 주소 변환 실패 시 네이버 장소 검색 결과의 이름·위치·좌표를 검증하는 보완 처리 추가.

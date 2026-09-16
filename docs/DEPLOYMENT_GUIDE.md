@@ -18,6 +18,8 @@ Sple supports text-only place extraction.
 
 Users should paste Instagram captions, blog snippets, restaurant descriptions, or other copied text that contains place information. Direct Instagram URL scraping is intentionally excluded because Instagram frequently blocks automated access.
 
+When Meta grants Instagram messaging access, users can also share a post to the Sple Instagram account. Sple replies with a seven-day, one-time save link. The user signs in with Google and confirms the extracted places before saving them. Shared-post webhooks can contain only a URL, so users may still need to enter a place name when the message has no usable title.
+
 ## 3. Vercel Environment Variables
 
 Required:
@@ -51,6 +53,8 @@ DATABASE_URL=postgresql://...
 NVIDIA_API_KEY=...
 INSTAGRAM_WEBHOOK_VERIFY_TOKEN=...
 META_APP_SECRET=...
+IG_PAGE_ACCESS_TOKEN=...
+INSTAGRAM_BUSINESS_ACCOUNT_ID=...
 FRONTEND_URL=https://sple-insta.com
 ALLOWED_ORIGINS=https://sple-insta.com,https://www.sple-insta.com
 BACKEND_API_KEY=...
@@ -59,6 +63,8 @@ BACKEND_API_KEY=...
 `DATABASE_URL` may use the standard Supabase Postgres URI. The app converts `postgresql://` to `postgresql+asyncpg://` automatically for SQLAlchemy async.
 
 The Instagram webhook callback is `https://api.sple-insta.com/webhooks/instagram`. Keep the verification token and Meta app secret backend-only. Configure the callback only after the endpoint is deployed and its GET verification succeeds.
+
+`IG_PAGE_ACCESS_TOKEN` and `INSTAGRAM_BUSINESS_ACCOUNT_ID` are also backend-only. The former must be an access token for `sple_place` with `instagram_business_manage_messages`; the latter is the Instagram business account ID. Store both as GitHub Actions secrets so the ECS deployment receives them.
 
 ## 5. API Routing
 

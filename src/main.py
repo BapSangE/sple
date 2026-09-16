@@ -18,11 +18,18 @@ from uuid import UUID
 from typing import Optional
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, text as sql_text
+from sqlalchemy import delete, select, text as sql_text
 from sqlalchemy.exc import IntegrityError
 from ai_extraction import extract_places, MAX_TEXT_LENGTH, AI_TIMEOUT_SECONDS
-from database import get_db, init_db, Place as DBPlace
+from database import (
+    InstagramShare,
+    Place as DBPlace,
+    async_session,
+    get_db,
+    init_db,
+)
 from naver_place_search import search_naver_local_place
+from urllib.parse import quote
 
 # .env 파일 로드
 load_dotenv()
@@ -35,6 +42,7 @@ logger = logging.getLogger(__name__)
 INSTAGRAM_WEBHOOK_VERIFY_TOKEN = os.getenv("INSTAGRAM_WEBHOOK_VERIFY_TOKEN")
 META_APP_SECRET = os.getenv("META_APP_SECRET")
 IG_PAGE_ACCESS_TOKEN = os.getenv("IG_PAGE_ACCESS_TOKEN")
+INSTAGRAM_BUSINESS_ACCOUNT_ID = os.getenv("INSTAGRAM_BUSINESS_ACCOUNT_ID")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://sple-insta.com")
 BACKEND_API_KEY = os.getenv("BACKEND_API_KEY")
 ALLOWED_ORIGINS = [
@@ -98,6 +106,7 @@ class PlaceItem(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     geocoding_status: str = "pending"
+    instagram_claim_token: Optional[str] = None
 
     @field_validator("user_id", "name", mode="before")
     @classmethod
@@ -114,6 +123,15 @@ class PlaceItem(BaseModel):
         if not isinstance(value, str):
             raise ValueError("must be a string")
         return value.strip()
+
+    @field_validator("instagram_claim_token")
+    @classmethod
+    def validate_instagram_claim_token(cls, value):
+        if value is None:
+            return None
+        if not isinstance(value, str) or not value or len(value) > 64:
+            raise ValueError("must be a valid Instagram claim token")
+        return value
 
 
 class PlaceEnrichRequest(BaseModel):
@@ -305,27 +323,95 @@ def _shared_post_from_message(message: dict) -> dict | None:
     return None
 
 
+def _instagram_claim_url(claim_token: str) -> str:
+    return f"{FRONTEND_URL.rstrip('/')}/add?claim={quote(claim_token)}"
+
+
+async def _send_instagram_text(recipient_id: str, message: str) -> bool:
+    """Reply inside the customer-initiated Instagram conversation."""
+    if not IG_PAGE_ACCESS_TOKEN or not INSTAGRAM_BUSINESS_ACCOUNT_ID:
+        logger.warning(
+            "Instagram reply skipped because IG_PAGE_ACCESS_TOKEN or "
+            "INSTAGRAM_BUSINESS_ACCOUNT_ID is not configured"
+        )
+        return False
+
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as http_client:
+            response = await http_client.post(
+                "https://graph.instagram.com/v25.0/"
+                f"{INSTAGRAM_BUSINESS_ACCOUNT_ID}/messages",
+                headers={"Authorization": f"Bearer {IG_PAGE_ACCESS_TOKEN}"},
+                json={"recipient": {"id": recipient_id}, "message": {"text": message}},
+            )
+        if response.is_success:
+            return True
+        logger.warning(
+            "Instagram reply failed (status=%s response=%s)",
+            response.status_code,
+            response.text[:500],
+        )
+    except httpx.HTTPError:
+        logger.exception("Instagram reply request failed")
+    return False
+
+
+async def _create_instagram_share(
+    sender_id: str, shared: dict, places: list[dict],
+) -> InstagramShare:
+    now = datetime.now(timezone.utc)
+    async with async_session() as db:
+        await db.execute(delete(InstagramShare).where(InstagramShare.expires_at < now))
+        instagram_share = InstagramShare(
+            claim_token=secrets.token_urlsafe(32),
+            sender_id=sender_id,
+            source_url=shared.get("url", ""),
+            title=shared.get("title", ""),
+            places_json=json.dumps(places, ensure_ascii=False),
+            expires_at=now + timedelta(days=7),
+        )
+        db.add(instagram_share)
+        await db.commit()
+        await db.refresh(instagram_share)
+        return instagram_share
+
+
 async def process_instagram_shared_post(event_id: str, sender_id: str, shared: dict):
     title = shared.get("title", "")
-    if not title:
+    places: list[dict] = []
+    if title:
+        try:
+            places = await extract_place_info(title[:MAX_TEXT_LENGTH])
+        except HTTPException as exc:
+            logger.warning(
+                "Instagram shared post analysis failed (event=%s code=%s)",
+                event_id,
+                exc.detail.get("code") if isinstance(exc.detail, dict) else "HTTP_ERROR",
+            )
+        except Exception:
+            logger.exception("Instagram shared post processing failed (event=%s)", event_id)
+    else:
         logger.info("Instagram shared post received without caption (event=%s)", event_id)
-        return
+
     try:
-        places = await extract_place_info(title[:MAX_TEXT_LENGTH])
-        logger.info(
-            "Instagram shared post analyzed (event=%s sender=%s places=%s)",
-            event_id,
-            sender_id,
-            json.dumps(places, ensure_ascii=False),
-        )
-    except HTTPException as exc:
-        logger.warning(
-            "Instagram shared post analysis failed (event=%s code=%s)",
-            event_id,
-            exc.detail.get("code") if isinstance(exc.detail, dict) else "HTTP_ERROR",
-        )
+        instagram_share = await _create_instagram_share(sender_id, shared, places)
     except Exception:
-        logger.exception("Instagram shared post processing failed (event=%s)", event_id)
+        logger.exception("Instagram shared post could not be stored (event=%s)", event_id)
+        return
+
+    reply_sent = await _send_instagram_text(
+        sender_id,
+        "공유한 게시물을 Sple에 저장할 준비가 됐어요.\n"
+        f"{_instagram_claim_url(instagram_share.claim_token)}\n"
+        "링크를 열어 장소를 확인하고 저장해 주세요.",
+    )
+    logger.info(
+        "Instagram shared post prepared (event=%s sender=%s places=%s reply_sent=%s)",
+        event_id,
+        sender_id,
+        len(places),
+        reply_sent,
+    )
 
 
 def _mark_instagram_event_seen(event_id: str) -> bool:
@@ -411,6 +497,43 @@ async def db_health_check(db: AsyncSession = Depends(get_db)):
     await db.execute(sql_text("SELECT 1"))
     return {"status": "ok", "database": "reachable"}
 
+
+@app.get("/api/instagram/claims/{claim_token}")
+async def get_instagram_claim_api(
+    claim_token: str,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(verify_internal_api_key),
+):
+    instagram_share = await db.scalar(
+        select(InstagramShare).where(InstagramShare.claim_token == claim_token)
+    )
+    if not instagram_share:
+        raise HTTPException(status_code=404, detail={"code": "INSTAGRAM_CLAIM_NOT_FOUND"})
+
+    expires_at = instagram_share.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at <= datetime.now(timezone.utc):
+        raise HTTPException(status_code=410, detail={"code": "INSTAGRAM_CLAIM_EXPIRED"})
+
+    try:
+        places = json.loads(instagram_share.places_json)
+    except json.JSONDecodeError:
+        logger.error("Instagram claim has invalid places JSON (id=%s)", instagram_share.id)
+        places = []
+    if not isinstance(places, list):
+        places = []
+
+    return JSONResponse(content={
+        "status": "success",
+        "data": {
+            "title": instagram_share.title,
+            "source_url": instagram_share.source_url,
+            "places": places,
+            "expires_at": expires_at.isoformat(),
+        },
+    })
+
 @app.post("/api/analyze")
 async def analyze_place_api(
     request: AnalyzeRequest,
@@ -437,11 +560,34 @@ async def create_place_api(
     _: None = Depends(verify_internal_api_key),
 ):
     request_id = str(place.request_id) if place.request_id else None
+    instagram_share = None
+    if place.instagram_claim_token:
+        instagram_share = await db.scalar(
+            select(InstagramShare).where(
+                InstagramShare.claim_token == place.instagram_claim_token
+            )
+        )
+        if not instagram_share:
+            raise HTTPException(status_code=404, detail={"code": "INSTAGRAM_CLAIM_NOT_FOUND"})
+        expires_at = instagram_share.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at <= datetime.now(timezone.utc):
+            raise HTTPException(status_code=410, detail={"code": "INSTAGRAM_CLAIM_EXPIRED"})
+        if (
+            instagram_share.claimed_by_user_id
+            and instagram_share.claimed_by_user_id != place.user_id
+        ):
+            raise HTTPException(status_code=409, detail={"code": "INSTAGRAM_CLAIM_ALREADY_USED"})
+
     if request_id:
         existing = await db.scalar(select(DBPlace).where(
             DBPlace.user_id == place.user_id, DBPlace.request_id == request_id
         ))
         if existing:
+            if instagram_share and not instagram_share.claimed_by_user_id:
+                instagram_share.claimed_by_user_id = place.user_id
+                await db.commit()
             return JSONResponse(content={"status": "success", "data": serialize_place(existing)})
 
     lat = place.latitude
@@ -471,6 +617,8 @@ async def create_place_api(
         geocoding_status=status,
     )
     db.add(db_place)
+    if instagram_share:
+        instagram_share.claimed_by_user_id = place.user_id
     try:
         await db.commit()
     except IntegrityError:

@@ -14,8 +14,8 @@ export default function TermsPage() {
           <h2 className="text-lg font-bold">1. 서비스 목적</h2>
           <p className="text-sm leading-7">
             Sple은 사용자가 직접 붙여넣은 Instagram 캡션, 맛집 소개 글, 주소가
-            포함된 텍스트에서 장소 정보를 추출하고 개인 장소 목록에 저장할 수
-            있도록 돕는 서비스입니다.
+            포함된 텍스트 또는 Sple Instagram 계정에 공유한 게시물에서 장소
+            정보를 추출하고 개인 장소 목록에 저장할 수 있도록 돕는 서비스입니다.
           </p>
         </section>
 
