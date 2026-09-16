@@ -1,8 +1,12 @@
 from contextlib import asynccontextmanager
 import asyncio
+from collections import deque
+import hashlib
+import hmac
+import json
 from datetime import datetime, timezone, timedelta
-from fastapi import FastAPI, HTTPException, Depends, Header
-from fastapi.responses import JSONResponse
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Depends, Header, Request
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 import os
@@ -28,7 +32,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # 환경 변수 설정
-FB_VERIFY_TOKEN = os.getenv("FB_VERIFY_TOKEN", "sple_default_token")
+INSTAGRAM_WEBHOOK_VERIFY_TOKEN = os.getenv("INSTAGRAM_WEBHOOK_VERIFY_TOKEN")
+META_APP_SECRET = os.getenv("META_APP_SECRET")
 IG_PAGE_ACCESS_TOKEN = os.getenv("IG_PAGE_ACCESS_TOKEN")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://sple-insta.com")
 BACKEND_API_KEY = os.getenv("BACKEND_API_KEY")
@@ -43,6 +48,8 @@ ALLOWED_ORIGINS = [
 
 # NVIDIA credentials are backend-only.
 client = None
+_instagram_seen_events: set[str] = set()
+_instagram_seen_order: deque[str] = deque(maxlen=2_000)
 
 
 def init_nvidia_client():
@@ -262,6 +269,132 @@ async def verify_internal_api_key(x_sple_internal_key: Optional[str] = Header(de
         raise HTTPException(503, detail={"code": "AUTH_NOT_CONFIGURED"})
     if not secrets.compare_digest(x_sple_internal_key or "", BACKEND_API_KEY):
         raise HTTPException(401, detail={"code": "UNAUTHORIZED"})
+
+
+def _instagram_signature_is_valid(body: bytes, signature: str | None) -> bool:
+    if not META_APP_SECRET or not signature or not signature.startswith("sha256="):
+        return False
+    supplied = signature.removeprefix("sha256=")
+    expected = hmac.new(META_APP_SECRET.encode("utf-8"), body, hashlib.sha256).hexdigest()
+    return secrets.compare_digest(supplied, expected)
+
+
+def _shared_post_from_message(message: dict) -> dict | None:
+    attachments = message.get("attachments")
+    if not isinstance(attachments, list):
+        return None
+
+    # Meta can include both the legacy `share` and `ig_post` attachment for one
+    # message during its transition. Prefer the current attachment and process once.
+    candidates = [item for item in attachments if isinstance(item, dict)]
+    candidates.sort(key=lambda item: 0 if item.get("type") == "ig_post" else 1)
+    for attachment in candidates:
+        if attachment.get("type") not in {"ig_post", "share"}:
+            continue
+        payload = attachment.get("payload")
+        if not isinstance(payload, dict):
+            continue
+        title = payload.get("title")
+        url = payload.get("url")
+        if isinstance(title, str) or isinstance(url, str):
+            return {
+                "title": title.strip() if isinstance(title, str) else "",
+                "url": url.strip() if isinstance(url, str) else "",
+                "media_id": payload.get("ig_post_media_id"),
+            }
+    return None
+
+
+async def process_instagram_shared_post(event_id: str, sender_id: str, shared: dict):
+    title = shared.get("title", "")
+    if not title:
+        logger.info("Instagram shared post received without caption (event=%s)", event_id)
+        return
+    try:
+        places = await extract_place_info(title[:MAX_TEXT_LENGTH])
+        logger.info(
+            "Instagram shared post analyzed (event=%s sender=%s places=%s)",
+            event_id,
+            sender_id,
+            json.dumps(places, ensure_ascii=False),
+        )
+    except HTTPException as exc:
+        logger.warning(
+            "Instagram shared post analysis failed (event=%s code=%s)",
+            event_id,
+            exc.detail.get("code") if isinstance(exc.detail, dict) else "HTTP_ERROR",
+        )
+    except Exception:
+        logger.exception("Instagram shared post processing failed (event=%s)", event_id)
+
+
+def _mark_instagram_event_seen(event_id: str) -> bool:
+    if event_id in _instagram_seen_events:
+        return False
+    if len(_instagram_seen_order) == _instagram_seen_order.maxlen:
+        _instagram_seen_events.discard(_instagram_seen_order[0])
+    _instagram_seen_order.append(event_id)
+    _instagram_seen_events.add(event_id)
+    return True
+
+
+@app.get("/webhooks/instagram")
+async def verify_instagram_webhook(request: Request):
+    params = request.query_params
+    if (
+        params.get("hub.mode") == "subscribe"
+        and INSTAGRAM_WEBHOOK_VERIFY_TOKEN
+        and secrets.compare_digest(
+            params.get("hub.verify_token", ""), INSTAGRAM_WEBHOOK_VERIFY_TOKEN
+        )
+        and params.get("hub.challenge")
+    ):
+        return PlainTextResponse(params["hub.challenge"])
+    raise HTTPException(status_code=403, detail={"code": "WEBHOOK_VERIFICATION_FAILED"})
+
+
+@app.post("/webhooks/instagram")
+async def receive_instagram_webhook(request: Request, background_tasks: BackgroundTasks):
+    body = await request.body()
+    if not _instagram_signature_is_valid(body, request.headers.get("x-hub-signature-256")):
+        raise HTTPException(status_code=403, detail={"code": "WEBHOOK_SIGNATURE_INVALID"})
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail={"code": "WEBHOOK_INVALID_JSON"}) from exc
+
+    if not isinstance(payload, dict) or payload.get("object") != "instagram":
+        return {"status": "ignored"}
+
+    accepted = 0
+    entries = payload.get("entry")
+    if not isinstance(entries, list):
+        return {"status": "accepted", "events": 0}
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        for messaging in entry.get("messaging", []):
+            if not isinstance(messaging, dict):
+                continue
+            message = messaging.get("message")
+            if not isinstance(message, dict):
+                continue
+            shared = _shared_post_from_message(message)
+            if not shared:
+                continue
+            event_id = str(message.get("mid") or "")
+            if not event_id:
+                event_id = hashlib.sha256(
+                    json.dumps(messaging, sort_keys=True).encode("utf-8")
+                ).hexdigest()
+            if not _mark_instagram_event_seen(event_id):
+                continue
+            sender_id = str((messaging.get("sender") or {}).get("id") or "unknown")
+            background_tasks.add_task(process_instagram_shared_post, event_id, sender_id, shared)
+            accepted += 1
+
+    return {"status": "accepted", "events": accepted}
+
 
 @app.get("/")
 async def read_root():

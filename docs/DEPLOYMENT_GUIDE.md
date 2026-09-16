@@ -48,21 +48,17 @@ Required:
 
 ```env
 DATABASE_URL=postgresql://...
-GCP_SA_KEY_JSON=...
-GCP_PROJECT_ID=...
-GCP_LOCATION=us-central1
+NVIDIA_API_KEY=...
+INSTAGRAM_WEBHOOK_VERIFY_TOKEN=...
+META_APP_SECRET=...
 FRONTEND_URL=https://sple-insta.com
 ALLOWED_ORIGINS=https://sple-insta.com,https://www.sple-insta.com
 BACKEND_API_KEY=...
 ```
 
-Optional:
-
-```env
-GEMINI_API_KEY=...
-```
-
 `DATABASE_URL` may use the standard Supabase Postgres URI. The app converts `postgresql://` to `postgresql+asyncpg://` automatically for SQLAlchemy async.
+
+The Instagram webhook callback is `https://api.sple-insta.com/webhooks/instagram`. Keep the verification token and Meta app secret backend-only. Configure the callback only after the endpoint is deployed and its GET verification succeeds.
 
 ## 5. API Routing
 

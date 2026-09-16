@@ -18,6 +18,13 @@ Production deployment requires applying the additive save-request migration befo
 - 변경 내역: [[CHANGELOG]].
 - 검증 완료: Python 3.12 백엔드 47개 테스트 통과. 외부 AI/운영 DB 호출 없이 검증.
 
+## 2026-09-16 Instagram DM 공유 웹훅
+
+- `GET/POST /webhooks/instagram`을 추가해 Meta 검증과 서명 검증을 수행.
+- `ig_post` 캡션을 기존 Nemotron 분석기에 전달하고 중복 `mid`를 건너뜀.
+- 실제 Meta payload 수신 후 Instagram 발신자와 Sple 계정을 연결하고 자동 저장하는 후속 설계를 확정.
+- 운영 Secrets: `INSTAGRAM_WEBHOOK_VERIFY_TOKEN`, `META_APP_SECRET`.
+
 ## 2026-09-16 건물명 주소 좌표 복구와 광고 요청 정리
 
 - 증거: 운영 버터앤쉘터의 주소는 용산 아이파크몰이며 좌표/네이버 메타데이터가 없음.

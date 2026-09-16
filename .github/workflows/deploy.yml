@@ -70,6 +70,8 @@ jobs:
           environment-variables: |
             DATABASE_URL=${{ secrets.DATABASE_URL }}
             NVIDIA_API_KEY=${{ secrets.NVIDIA_API_KEY }}
+            INSTAGRAM_WEBHOOK_VERIFY_TOKEN=${{ secrets.INSTAGRAM_WEBHOOK_VERIFY_TOKEN }}
+            META_APP_SECRET=${{ secrets.META_APP_SECRET }}
             GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
             GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
             NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}

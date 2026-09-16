@@ -170,6 +170,8 @@ FRONTEND_URL=https://www.sple-insta.com
 ALLOWED_ORIGINS=https://www.sple-insta.com,https://sple-insta.com
 
 NVIDIA_API_KEY=...
+INSTAGRAM_WEBHOOK_VERIFY_TOKEN=...
+META_APP_SECRET=...
 
 NEXT_PUBLIC_NAVER_CLIENT_ID=...
 NAVER_CLIENT_SECRET=...
@@ -298,6 +300,8 @@ DATABASE_URL
 BACKEND_API_KEY
 FRONTEND_URL
 NVIDIA_API_KEY
+INSTAGRAM_WEBHOOK_VERIFY_TOKEN
+META_APP_SECRET
 GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET
 NEXTAUTH_SECRET
@@ -336,6 +340,15 @@ BACKEND_HEALTH_URL
 - 추론 비활성화, 비스트리밍 비동기 호출, 전체 25초 제한 및 SDK 자동 재시도 비활성화로 기존 API 응답 계약을 유지합니다.
 - JSON 배열을 프롬프트로 요청하고 서버에서 검증합니다. 잘린 응답/잘못된 JSON은 오류로 처리합니다.
 - 키가 없으면 분석은 503을 반환합니다. 실제 모델 품질과 지연은 키 등록 후 확인해야 합니다.
+
+## Instagram DM 공유 웹훅
+
+Meta에서 `sple_place` Instagram 계정으로 공유된 게시물을 받으려면 다음 값을 백엔드 환경변수로 설정합니다.
+
+- `INSTAGRAM_WEBHOOK_VERIFY_TOKEN`: Meta Webhooks 화면의 인증 토큰과 같은 임의의 값
+- `META_APP_SECRET`: Meta 앱 시크릿 코드. POST 서명 검증에만 사용하며 프론트엔드에 노출하지 않습니다.
+
+콜백 URL은 `https://api.sple-insta.com/webhooks/instagram`입니다. GET 검증이 성공하면 Meta 화면에서 메시지 이벤트 구독을 저장할 수 있습니다. POST 수신부는 `ig_post` 공유의 캡션을 Nemotron 분석에 넘기고 처리 결과를 백엔드 로그에 기록합니다. 현재 단계에서는 Instagram 발신자와 Sple 로그인 사용자를 자동으로 연결하거나 장소를 바로 저장하지 않으므로, 먼저 실제 payload를 확인한 뒤 계정 연결·저장 흐름을 추가합니다.
 
 ## 건물명 주소의 좌표 복구
 
