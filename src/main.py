@@ -443,6 +443,7 @@ async def verify_instagram_webhook(request: Request):
 async def receive_instagram_webhook(request: Request, background_tasks: BackgroundTasks):
     body = await request.body()
     if not _instagram_signature_is_valid(body, request.headers.get("x-hub-signature-256")):
+        logger.warning("Instagram webhook rejected because its signature was invalid")
         raise HTTPException(status_code=403, detail={"code": "WEBHOOK_SIGNATURE_INVALID"})
     try:
         payload = json.loads(body)
@@ -450,12 +451,15 @@ async def receive_instagram_webhook(request: Request, background_tasks: Backgrou
         raise HTTPException(status_code=400, detail={"code": "WEBHOOK_INVALID_JSON"}) from exc
 
     if not isinstance(payload, dict) or payload.get("object") != "instagram":
+        logger.info("Instagram webhook ignored because its object was not instagram")
         return {"status": "ignored"}
 
     accepted = 0
     entries = payload.get("entry")
     if not isinstance(entries, list):
+        logger.info("Instagram webhook received without entries")
         return {"status": "accepted", "events": 0}
+    logger.info("Instagram webhook received (entries=%s)", len(entries))
     for entry in entries:
         if not isinstance(entry, dict):
             continue
@@ -464,9 +468,20 @@ async def receive_instagram_webhook(request: Request, background_tasks: Backgrou
                 continue
             message = messaging.get("message")
             if not isinstance(message, dict):
+                logger.info("Instagram webhook ignored a non-message event")
                 continue
             shared = _shared_post_from_message(message)
             if not shared:
+                attachment_types = [
+                    item.get("type")
+                    for item in message.get("attachments", [])
+                    if isinstance(item, dict) and isinstance(item.get("type"), str)
+                ]
+                logger.info(
+                    "Instagram message ignored because it was not a supported post share "
+                    "(attachment_types=%s)",
+                    attachment_types,
+                )
                 continue
             event_id = str(message.get("mid") or "")
             if not event_id:
